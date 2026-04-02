@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Clock, CheckCircle, AlertCircle, Save, RefreshCw, MapPin, Image as ImageIcon, ExternalLink } from "lucide-react";
+import { FileText, Clock, CheckCircle, AlertCircle, Save, RefreshCw, MapPin, Image as ImageIcon, ExternalLink, Video } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { apiService } from "@/services/apiService";
 import { useToast } from "@/hooks/use-toast";
@@ -334,6 +334,61 @@ const WardAdminComplaints = () => {
                               alt="Complaint image"
                               className="max-h-[200px] w-auto rounded-lg border border-gray-300 shadow-sm object-contain"
                             />
+                            <p className="text-xs text-gray-400 mt-2 italic">
+                              No GPS coordinates available for this complaint
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Complaint Video Section - Only show if video exists */}
+                  {complaint.videoUrl && (
+                    <div>
+                      <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider flex items-center gap-2">
+                        <Video className="h-4 w-4" />
+                        Complaint Video
+                      </p>
+                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                        {complaint.latitude && complaint.longitude ? (
+                          <a
+                            href={`https://www.google.com/maps?q=${complaint.latitude},${complaint.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block group cursor-pointer"
+                            title="Click to view location on Google Maps"
+                          >
+                            <div className="relative inline-block">
+                              <video
+                                src={complaint.videoUrl}
+                                controls
+                                className="max-h-[200px] w-auto rounded-lg border border-gray-300 shadow-sm group-hover:shadow-lg group-hover:border-green-400 transition-all duration-200"
+                                preload="metadata"
+                              >
+                                Your browser does not support the video tag.
+                              </video>
+                              <div className="absolute bottom-2 right-2 bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded-md flex items-center gap-1 shadow-md opacity-90 group-hover:opacity-100 transition-opacity">
+                                <MapPin className="h-3 w-3" />
+                                <span>View on Map</span>
+                                <ExternalLink className="h-3 w-3" />
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-green-600" />
+                              GPS: {complaint.latitude.toFixed(6)}, {complaint.longitude.toFixed(6)}
+                            </p>
+                          </a>
+                        ) : (
+                          <div>
+                            <video
+                              src={complaint.videoUrl}
+                              controls
+                              className="max-h-[200px] w-auto rounded-lg border border-gray-300 shadow-sm"
+                              preload="metadata"
+                            >
+                              Your browser does not support the video tag.
+                            </video>
                             <p className="text-xs text-gray-400 mt-2 italic">
                               No GPS coordinates available for this complaint
                             </p>

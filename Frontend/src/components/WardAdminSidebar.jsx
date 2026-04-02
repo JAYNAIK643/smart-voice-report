@@ -6,6 +6,7 @@ import {
   MapPin,
   LogOut,
   FileArchive,
+  Mail,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 
@@ -18,6 +19,7 @@ const WardAdminSidebar = () => {
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/ward-admin/dashboard" },
     { icon: FileText, label: "Ward Complaints", path: "/ward-admin/complaints" },
+    { icon: Mail, label: "Contact Messages", path: "/ward-admin/contact-messages" },
     { icon: MapPin, label: "My Ward", path: "/ward-admin/ward-info" },
   ];
 

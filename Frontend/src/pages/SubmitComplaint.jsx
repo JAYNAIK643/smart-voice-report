@@ -1,7 +1,7 @@
 // import { authService } from "@/services/authService";
  //Updated
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,20 @@ const SubmitComplaint = () => {
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState(null);
 
+  // Image preview state
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageProcessing, setImageProcessing] = useState(false);
+  
+  // Video upload state
+  const [videoFile, setVideoFile] = useState(null);
+  const [videoPreview, setVideoPreview] = useState(null);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoUrl, setVideoUrl] = useState(null);
+  
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+  const videoInputRef = useRef(null);
+
   // AI Categorization state
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -129,6 +143,53 @@ const SubmitComplaint = () => {
     }
   }, [currentStep, geolocation.latitude, geoLoading, captureGeolocation]);
 
+  // Handle chatbot auto-fill data
+  useEffect(() => {
+    const chatbotData = sessionStorage.getItem('chatbot-auto-fill');
+    if (chatbotData) {
+      try {
+        const data = JSON.parse(chatbotData);
+        
+        // Map category from chatbot to form
+        const categoryMap = {
+          'Street Light': 'Street Lighting',
+          'Roads': 'Road Maintenance',
+          'Garbage': 'Waste Management',
+          'Water Supply': 'Water Supply',
+          'Sewerage': 'Other',
+          'Public Building': 'Public Buildings',
+          'Parks': 'Parks & Gardens',
+          'Others': 'Other'
+        };
+        
+        setFormData(prev => ({
+          ...prev,
+          category: categoryMap[data.category] || data.category || prev.category,
+          description: data.description || prev.description,
+          address: data.location || prev.address,
+        }));
+        
+        // Show toast notification
+        toast({
+          title: "Form Auto-Filled",
+          description: `Category: ${data.category}. Please review and add any missing details.`,
+        });
+        
+        // Clear the data after using it
+        sessionStorage.removeItem('chatbot-auto-fill');
+        
+        // Auto-trigger camera if requested
+        if (data.autoTriggerCamera && cameraInputRef.current) {
+          setTimeout(() => {
+            cameraInputRef.current.click();
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('Error parsing chatbot data:', error);
+      }
+    }
+  }, [toast]);
+
   // Convert file to base64 for storage
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
@@ -137,6 +198,194 @@ const SubmitComplaint = () => {
       reader.onload = () => resolve(reader.result);
       reader.onerror = (error) => reject(error);
     });
+  };
+
+  // Compress image to ensure it's under 1MB
+  const compressImage = async (file, maxWidth = 1280, maxHeight = 1280, quality = 0.8) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      img.onload = () => {
+        let { width, height } = img;
+
+        // Calculate new dimensions maintaining aspect ratio
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw resized image
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to blob with compression
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+            } else {
+              reject(new Error('Failed to compress image'));
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  // Handle image file selection with compression
+  const handleImageSelect = async (file) => {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        variant: "destructive",
+        title: "Invalid file type",
+        description: "Please select an image file (PNG, JPG, etc.)",
+      });
+      return;
+    }
+
+    setImageProcessing(true);
+
+    try {
+      // Show preview immediately
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+
+      // Compress if file is larger than 500KB
+      let processedFile = file;
+      if (file.size > 500 * 1024) {
+        processedFile = await compressImage(file);
+        console.log(`Compressed: ${(file.size / 1024).toFixed(1)}KB → ${(processedFile.size / 1024).toFixed(1)}KB`);
+      }
+
+      // Final size check
+      if (processedFile.size > 1024 * 1024) {
+        toast({
+          variant: "destructive",
+          title: "Image too large",
+          description: "Even after compression, image exceeds 1MB. Please try a different image.",
+        });
+        setImagePreview(null);
+        setImageProcessing(false);
+        return;
+      }
+
+      setFormData({ ...formData, file: processedFile });
+      toast({
+        title: "Image ready",
+        description: `Image size: ${(processedFile.size / 1024).toFixed(1)}KB`,
+      });
+    } catch (error) {
+      console.error("Image processing error:", error);
+      toast({
+        variant: "destructive",
+        title: "Processing failed",
+        description: "Failed to process image. Please try again.",
+      });
+      setImagePreview(null);
+    } finally {
+      setImageProcessing(false);
+    }
+  };
+
+  // Remove selected image
+  const removeImage = () => {
+    setImagePreview(null);
+    setFormData({ ...formData, file: null });
+  };
+
+  // Handle video file selection
+  const handleVideoSelect = async (file) => {
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid video format",
+        description: "Please select MP4, WebM, or QuickTime video",
+      });
+      return;
+    }
+
+    // Validate file size (max 20MB)
+    const maxSize = 20 * 1024 * 1024; // 20MB
+    if (file.size > maxSize) {
+      toast({
+        variant: "destructive",
+        title: "Video too large",
+        description: "Maximum video size is 20MB",
+      });
+      return;
+    }
+
+    setVideoFile(file);
+    setVideoPreview(URL.createObjectURL(file));
+    
+    // Upload video immediately
+    await uploadVideo(file);
+  };
+
+  // Upload video to server
+  const uploadVideo = async (file) => {
+    setVideoUploading(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('video', file);
+
+      const response = await fetch(`${BACKEND_URL}/api/video/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setVideoUrl(data.data.videoUrl);
+        toast({
+          title: "Video uploaded",
+          description: "Video ready for submission",
+        });
+      } else {
+        throw new Error(data.message || 'Upload failed');
+      }
+    } catch (error) {
+      console.error("Video upload error:", error);
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: error.message || "Failed to upload video",
+      });
+      // Clear video on error
+      setVideoFile(null);
+      setVideoPreview(null);
+    } finally {
+      setVideoUploading(false);
+    }
+  };
+
+  // Remove selected video
+  const removeVideo = () => {
+    setVideoFile(null);
+    setVideoPreview(null);
+    setVideoUrl(null);
   };
 
   // Trigger AI categorization when description changes
@@ -278,7 +527,7 @@ const SubmitComplaint = () => {
         }
       }
 
-      const response = await fetch("http://localhost:3000/api/grievances", {
+      const response = await fetch(`${BACKEND_URL}/api/grievances`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -291,8 +540,9 @@ const SubmitComplaint = () => {
           address: formData.address,
           ward: formData.ward, // Include ward field
           priority: "high",
-          // Image and geolocation data
+          // Image, video and geolocation data
           imageUrl: imageUrl,
+          videoUrl: videoUrl, // Include video URL if uploaded
           latitude: geolocation.latitude,
           longitude: geolocation.longitude,
         }),
@@ -301,6 +551,15 @@ const SubmitComplaint = () => {
       const result = await response.json();
 
       if (!response.ok) {
+        // Handle image validation errors specifically
+        if (result.errorType === 'IMAGE_VALIDATION_FAILED') {
+          toast({
+            variant: "destructive",
+            title: "Invalid Image",
+            description: result.message || "Uploaded image is not valid. Please upload a relevant real image.",
+          });
+          return;
+        }
         throw new Error(result.message || "Failed to submit grievance");
       }
 
@@ -322,6 +581,8 @@ const SubmitComplaint = () => {
       setSuggestionDismissed(false);
       setGeolocation({ latitude: null, longitude: null });
       setGeoError(null);
+      setImagePreview(null); // Reset image preview
+      setImageProcessing(false);
 
       toast({
         title: "Success!",
@@ -810,46 +1071,200 @@ const SubmitComplaint = () => {
                     
                     <div>
                       <Label>Upload Photo/Document (Optional)</Label>
-                      <label 
-                        htmlFor="file-upload"
-                        className="mt-2 border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer block"
-                      >
-                        <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Click to upload or drag and drop
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          PNG, JPG or PDF (max. 1MB)
-                        </p>
-                      </label>
-                      <input
-                        id="file-upload"
-                        type="file"
-                        accept="image/*,.pdf"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0] || null;
-                          const MAX_SIZE = 1 * 1024 * 1024; // 1MB
-                          if (file && file.size > MAX_SIZE) {
-                            toast({
-                              variant: "destructive",
-                              title: "Image too large",
-                              description: "Image size must be less than 1MB. Please choose a smaller image.",
-                            });
-                            e.target.value = ''; // Clear the input
-                            return;
-                          }
-                          setFormData({ ...formData, file });
-                        }}
-                        className="hidden"
-                      />
-                      {formData.file && (
+                      
+                      {/* Image Preview */}
+                      {imagePreview && (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="mb-4 relative inline-block"
+                        >
+                          <img 
+                            src={imagePreview} 
+                            alt="Preview" 
+                            className="max-h-48 rounded-lg border border-border shadow-md"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={removeImage}
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                            disabled={imageProcessing}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                          {imageProcessing && (
+                            <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-lg">
+                              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+
+                      {/* Dual Upload Options */}
+                      {!imagePreview && (
+                        <div className="mt-2 space-y-3">
+                          {/* Camera Button - Mobile */}
+                          <label 
+                            htmlFor="camera-capture"
+                            className="flex items-center justify-center gap-3 border-2 border-primary/50 bg-primary/5 rounded-lg p-4 hover:bg-primary/10 transition-colors cursor-pointer"
+                          >
+                            <span className="text-2xl">📷</span>
+                            <div className="text-left">
+                              <p className="font-medium text-sm">Take Photo</p>
+                              <p className="text-xs text-muted-foreground">Open camera to capture</p>
+                            </div>
+                          </label>
+                          <input
+                            ref={cameraInputRef}
+                            id="camera-capture"
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleImageSelect(file);
+                            }}
+                            className="hidden"
+                          />
+
+                          {/* Gallery Button */}
+                          <label 
+                            htmlFor="gallery-upload"
+                            className="flex items-center justify-center gap-3 border-2 border-dashed border-border rounded-lg p-4 hover:border-primary/50 transition-colors cursor-pointer"
+                          >
+                            <Upload className="w-6 h-6 text-muted-foreground" />
+                            <div className="text-left">
+                              <p className="font-medium text-sm">Choose from Gallery</p>
+                              <p className="text-xs text-muted-foreground">PNG, JPG or PDF (max. 1MB)</p>
+                            </div>
+                          </label>
+                          <input
+                            ref={galleryInputRef}
+                            id="gallery-upload"
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleImageSelect(file);
+                            }}
+                            className="hidden"
+                          />
+                        </div>
+                      )}
+
+                      {/* File Info */}
+                      {formData.file && !imageProcessing && (
                         <motion.p 
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           className="mt-2 text-sm text-success font-medium flex items-center gap-2"
                         >
                           <Check size={16} />
-                          Selected: {formData.file.name}
+                          Ready: {formData.file.name} ({(formData.file.size / 1024).toFixed(1)}KB)
+                        </motion.p>
+                      )}
+                    </div>
+
+                    {/* Video Upload Section */}
+                    <div className="border-t border-border pt-6 mt-6">
+                      <Label>Upload Video (Optional)</Label>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Record a short video (max 20MB, MP4/WebM)
+                      </p>
+                      
+                      {/* Video Preview */}
+                      {videoPreview && (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="mb-4 relative"
+                        >
+                          <video 
+                            src={videoPreview} 
+                            controls
+                            className="max-h-48 w-full rounded-lg border border-border shadow-md"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={removeVideo}
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                            disabled={videoUploading}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                          {videoUploading && (
+                            <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-lg">
+                              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                              <span className="ml-2 text-sm">Uploading...</span>
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+
+                      {/* Video Upload Options */}
+                      {!videoPreview && (
+                        <div className="mt-2 space-y-3">
+                          {/* Record Video Button */}
+                          <label 
+                            htmlFor="video-capture"
+                            className="flex items-center justify-center gap-3 border-2 border-primary/50 bg-primary/5 rounded-lg p-4 hover:bg-primary/10 transition-colors cursor-pointer"
+                          >
+                            <span className="text-2xl">🎥</span>
+                            <div className="text-left">
+                              <p className="font-medium text-sm">Record Video</p>
+                              <p className="text-xs text-muted-foreground">Max 20 seconds recommended</p>
+                            </div>
+                          </label>
+                          <input
+                            ref={videoInputRef}
+                            id="video-capture"
+                            type="file"
+                            accept="video/*"
+                            capture="environment"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleVideoSelect(file);
+                            }}
+                            className="hidden"
+                          />
+
+                          {/* Gallery Video Button */}
+                          <label 
+                            htmlFor="video-gallery"
+                            className="flex items-center justify-center gap-3 border-2 border-dashed border-border rounded-lg p-4 hover:border-primary/50 transition-colors cursor-pointer"
+                          >
+                            <Upload className="w-6 h-6 text-muted-foreground" />
+                            <div className="text-left">
+                              <p className="font-medium text-sm">Choose Video from Gallery</p>
+                              <p className="text-xs text-muted-foreground">MP4 or WebM (max. 20MB)</p>
+                            </div>
+                          </label>
+                          <input
+                            id="video-gallery"
+                            type="file"
+                            accept="video/mp4,video/webm"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleVideoSelect(file);
+                            }}
+                            className="hidden"
+                          />
+                        </div>
+                      )}
+
+                      {/* Video Upload Status */}
+                      {videoUrl && !videoUploading && (
+                        <motion.p 
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-2 text-sm text-success font-medium flex items-center gap-2"
+                        >
+                          <Check size={16} />
+                          Video uploaded successfully
                         </motion.p>
                       )}
                     </div>

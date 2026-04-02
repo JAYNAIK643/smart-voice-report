@@ -87,6 +87,11 @@ const grievanceSchema = new mongoose.Schema(
       type: String,
       default: null
     },
+    // Video complaint field
+    videoUrl: {
+      type: String,
+      default: null
+    },
     latitude: {
       type: Number,
       default: null
@@ -94,6 +99,17 @@ const grievanceSchema = new mongoose.Schema(
     longitude: {
       type: Number,
       default: null
+    },
+    // Image hash for duplicate detection
+    imageHash: {
+      type: String,
+      default: null
+    },
+    // Image validation status
+    imageValidation: {
+      isValid: { type: Boolean, default: true },
+      warnings: [String],
+      validatedAt: Date
     },
   },
   { timestamps: true }
@@ -110,5 +126,6 @@ grievanceSchema.index({ createdAt: -1 });
 grievanceSchema.index({ upvoteCount: -1 }); // Index for leaderboard sorting
 grievanceSchema.index({ 'aiAnalysis.isDuplicateSuspected': 1 });
 grievanceSchema.index({ assignedDepartment: 1 });
+grievanceSchema.index({ imageHash: 1 }); // Index for duplicate image detection
 
 module.exports = mongoose.model("Grievance", grievanceSchema);

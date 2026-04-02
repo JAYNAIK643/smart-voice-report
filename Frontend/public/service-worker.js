@@ -5,8 +5,9 @@ const CACHE_VERSION = 'v2.0.0';
 const CACHE_NAME = `smartcity-grs-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
 
-// Feature flag check - DISABLED to prevent caching issues in all environments
-const PWA_ENABLED = false;
+// Feature flag check - ENABLED for PWA functionality
+// Can be disabled by setting VITE_ENABLE_PWA=false in .env
+const PWA_ENABLED = true;
 
 // Assets to cache immediately on install
 const STATIC_ASSETS = [

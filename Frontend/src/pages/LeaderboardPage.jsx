@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Trophy, Medal, Award, Crown, TrendingUp, Users, Heart, 
   FileText, ChevronUp, ChevronDown, Minus, Star, Target,
-  Flame, Calendar, ArrowUpRight, RefreshCw
+  Flame, Calendar, ArrowUpRight, RefreshCw, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { apiService } from "@/services/apiService";
 import { Card } from "@/components/ui/card";
@@ -15,8 +15,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
+import { useBadges } from "@/context/badges-context";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import RewardBanner from "@/components/RewardBanner";
 
 const LeaderboardPage = () => {
   const { user } = useAuth();
@@ -25,6 +27,10 @@ const LeaderboardPage = () => {
   const [timeframe, setTimeframe] = useState("all"); // "all", "month", "week"
   const [currentUserRank, setCurrentUserRank] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     fetchLeaderboard();
@@ -51,6 +57,11 @@ const LeaderboardPage = () => {
       setCurrentUserRank(userRank >= 0 ? userRank + 1 : null);
     }
   }, [user, contributors]);
+
+  // Reset to first page when timeframe changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [timeframe]);
 
   const fetchLeaderboard = async () => {
     setLoading(true);
@@ -232,6 +243,15 @@ const LeaderboardPage = () => {
         </div>
       </section>
 
+      {/* Grand Reward Banner */}
+      <section className="py-8 px-4">
+        <div className="container mx-auto">
+          <div className="max-w-4xl mx-auto">
+            <RewardBanner />
+          </div>
+        </div>
+      </section>
+
       {/* Main Leaderboard */}
       <section className="py-12">
         <div className="container mx-auto px-4">
@@ -280,13 +300,16 @@ const LeaderboardPage = () => {
                 <p className="text-muted-foreground">Be the first to submit a complaint and appear on the leaderboard!</p>
               </Card>
             ) : (
-              <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-                className="space-y-3"
-              >
-                {contributors.map((contributor, index) => (
+              <>
+                <motion.div
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="space-y-3"
+                >
+                  {contributors
+                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                    .map((contributor, index) => (
                   <motion.div
                     key={contributor.user_id}
                     variants={itemVariants}
@@ -365,8 +388,57 @@ const LeaderboardPage = () => {
                       </div>
                     </div>
                   </motion.div>
-                ))}
-              </motion.div>
+                  ))}
+                </motion.div>
+
+                {/* Pagination */}
+                {contributors.length > itemsPerPage && (
+                  <div className="flex justify-center items-center gap-2 mt-8">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="gap-1"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+
+                    <div className="flex gap-1">
+                      {Array.from(
+                        { length: Math.ceil(contributors.length / itemsPerPage) },
+                        (_, i) => i + 1
+                      ).map((pageNum) => (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className="min-w-[40px]"
+                        >
+                          {pageNum}
+                        </Button>
+                      ))}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) =>
+                          Math.min(Math.ceil(contributors.length / itemsPerPage), p + 1)
+                        )
+                      }
+                      disabled={currentPage === Math.ceil(contributors.length / itemsPerPage)}
+                      className="gap-1"
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

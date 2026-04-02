@@ -40,7 +40,16 @@ export const BadgesProvider = ({ children }) => {
   }, [user]);
 
   const getUserProgress = useCallback(async () => {
-    if (!user) return { complaintsSubmitted: 0, complaintsResolved: 0, upvotesReceived: 0, upvotesGiven: 0 };
+    if (!user) return { 
+      complaintsSubmitted: 0, 
+      complaintsResolved: 0, 
+      upvotesReceived: 0, 
+      upvotesGiven: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      leaderboardRank: 999,
+      trustScore: 0
+    };
 
     try {
       const response = await apiService.getUserStats();
@@ -50,13 +59,26 @@ export const BadgesProvider = ({ children }) => {
           complaintsResolved: response.data.complaintsResolved || 0,
           upvotesReceived: response.data.upvotesReceived || 0,
           upvotesGiven: response.data.upvotesGiven || 0,
+          currentStreak: response.data.currentStreak || 0,
+          longestStreak: response.data.longestStreak || 0,
+          leaderboardRank: response.data.leaderboardRank || 999,
+          trustScore: response.data.trustScore || 0,
         };
       }
     } catch (error) {
       console.error("Error fetching user progress:", error);
     }
 
-    return { complaintsSubmitted: 0, complaintsResolved: 0, upvotesReceived: 0, upvotesGiven: 0 };
+    return { 
+      complaintsSubmitted: 0, 
+      complaintsResolved: 0, 
+      upvotesReceived: 0, 
+      upvotesGiven: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      leaderboardRank: 999,
+      trustScore: 0
+    };
   }, [user]);
 
   const checkForNewBadges = useCallback(async () => {
@@ -107,6 +129,17 @@ export const BadgesProvider = ({ children }) => {
       current = progress.upvotesReceived || 0;
     } else if (requirementField === 'upvotes_given' || requirementField === 'upvotesGiven') {
       current = progress.upvotesGiven || 0;
+    } else if (requirementField === 'currentStreak') {
+      current = progress.currentStreak || 0;
+    } else if (requirementField === 'longestStreak') {
+      current = progress.longestStreak || 0;
+    } else if (requirementField === 'leaderboardRank') {
+      // For leaderboard rank, lower is better, so invert the progress
+      const rank = progress.leaderboardRank || 999;
+      current = rank <= badge.value ? badge.value : 0;
+      return rank <= badge.value ? 100 : Math.max(0, Math.min(100, ((badge.value - rank + 50) / badge.value) * 100));
+    } else if (requirementField === 'trustScore') {
+      current = progress.trustScore || 0;
     }
     
     const targetValue = badge.value || badge.requirement_value;

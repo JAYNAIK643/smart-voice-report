@@ -1,12 +1,20 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, Bot, User, FileText, Search, Phone, Loader2, Minimize2, Maximize2, RefreshCw, WifiOff, Sparkles } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, FileText, Search, Phone, Loader2, Minimize2, Maximize2, RefreshCw, WifiOff, Sparkles, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import VoiceInput from '@/components/VoiceInput';
+import { parseUserInput, INTENTS, CATEGORIES } from '@/utils/intentParser';
+import { 
+  VoiceRecognizer, 
+  voiceSynthesizer, 
+  getResponseMessage,
+  isSpeechSupported,
+  CameraHelper
+} from '@/utils/voiceChatbot';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 const CHAT_URL = `${BACKEND_URL}/api/ai/chat`;
@@ -196,8 +204,16 @@ export const AIChatbot = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showAutoFill, setShowAutoFill] = useState(false);
   const [extractedDetails, setExtractedDetails] = useState(null);
+  
+  // Voice-related states
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [detectedLanguage, setDetectedLanguage] = useState('en-US');
+  const [speechSupported, setSpeechSupported] = useState(true);
+  
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const recognizerRef = useRef(null);
   const navigate = useNavigate();
 
   // Persist messages to localStorage
@@ -258,6 +274,158 @@ export const AIChatbot = () => {
       }
     }
   }, [messages, showAutoFill, extractedDetails]);
+
+  // Initialize voice recognizer
+  useEffect(() => {
+    if (!isSpeechSupported()) {
+      setSpeechSupported(false);
+      return;
+    }
+
+    try {
+      recognizerRef.current = new VoiceRecognizer(detectedLanguage);
+      
+      recognizerRef.current.onResult = (result) => {
+        setInput(result.interim || result.final);
+        if (result.isFinal && result.final) {
+          handleVoiceInput(result.final);
+        }
+      };
+      
+      recognizerRef.current.onError = (error) => {
+        console.error('Voice recognition error:', error);
+        setIsListening(false);
+      };
+      
+      recognizerRef.current.onEnd = () => {
+        setIsListening(false);
+      };
+    } catch (error) {
+      console.error('Failed to initialize voice recognizer:', error);
+      setSpeechSupported(false);
+    }
+
+    // Preload synthesis voices
+    voiceSynthesizer.preloadVoices();
+
+    return () => {
+      if (recognizerRef.current) {
+        recognizerRef.current.abort();
+      }
+      voiceSynthesizer.stop();
+    };
+  }, [detectedLanguage]);
+
+  // Handle voice input with intent parsing
+  const handleVoiceInput = async (text) => {
+    const parsed = parseUserInput(text);
+    setDetectedLanguage(parsed.language);
+    
+    // Add user message
+    const userMessage = { role: 'user', content: text };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    
+    // Process intent
+    await processIntent(parsed);
+  };
+
+  // Process detected intent
+  const processIntent = async (parsed) => {
+    setIsLoading(true);
+    
+    let responseText = '';
+    let shouldNavigate = false;
+    let navigateTo = '';
+    let autoFillData = null;
+
+    switch (parsed.intent) {
+      case INTENTS.SUBMIT_COMPLAINT:
+        if (parsed.category) {
+          responseText = getResponseMessage('confirmSubmit', parsed.language, { category: parsed.category });
+          shouldNavigate = true;
+          navigateTo = '/submit';
+          autoFillData = {
+            category: parsed.category,
+            description: parsed.description,
+            location: parsed.location,
+            language: parsed.language,
+            autoTriggerCamera: true
+          };
+        } else {
+          responseText = getResponseMessage('noCategory', parsed.language);
+        }
+        break;
+        
+      case INTENTS.TRACK_COMPLAINT:
+      case INTENTS.CHECK_STATUS:
+        responseText = getResponseMessage('confirmTrack', parsed.language);
+        shouldNavigate = true;
+        navigateTo = '/track';
+        break;
+        
+      case INTENTS.HELP:
+        responseText = getResponseMessage('help', parsed.language);
+        break;
+        
+      case INTENTS.GREETING:
+        responseText = getResponseMessage('greeting', parsed.language);
+        break;
+        
+      default:
+        // Fall back to AI chat for unknown intents
+        await streamChat([...messages, { role: 'user', content: parsed.text }].map(m => ({ 
+          role: m.role, 
+          content: m.content 
+        })));
+        setIsLoading(false);
+        return;
+    }
+
+    // Add assistant response
+    const assistantMessage = { 
+      role: 'assistant', 
+      content: responseText,
+      isVoice: true
+    };
+    setMessages(prev => [...prev, assistantMessage]);
+    
+    // Speak response
+    setIsSpeaking(true);
+    await voiceSynthesizer.speak(responseText, parsed.language);
+    setIsSpeaking(false);
+    
+    // Navigate if needed
+    if (shouldNavigate && navigateTo) {
+      setTimeout(() => {
+        if (autoFillData) {
+          sessionStorage.setItem('chatbot-auto-fill', JSON.stringify(autoFillData));
+        }
+        navigate(navigateTo);
+        setIsOpen(false);
+      }, 2000);
+    }
+    
+    setIsLoading(false);
+  };
+
+  // Toggle voice listening
+  const toggleVoiceListening = () => {
+    if (!recognizerRef.current) return;
+    
+    if (isListening) {
+      recognizerRef.current.stop();
+      setIsListening(false);
+    } else {
+      // Update language before starting
+      recognizerRef.current.setLanguage(detectedLanguage);
+      const started = recognizerRef.current.start();
+      if (started) {
+        setIsListening(true);
+        setInput('');
+      }
+    }
+  };
 
   const streamChat = async (userMessages, attempt = 0) => {
     const resp = await fetch(CHAT_URL, {
@@ -415,7 +583,7 @@ export const AIChatbot = () => {
     if (extractedDetails) {
       // Store in sessionStorage for the complaint form to pick up
       sessionStorage.setItem('chatbot-complaint-details', JSON.stringify(extractedDetails));
-      navigate('/submit-complaint');
+      navigate('/submit');
       setIsOpen(false);
     }
     setShowAutoFill(false);
@@ -429,8 +597,8 @@ export const AIChatbot = () => {
   };
 
   const quickActions = [
-    { icon: FileText, label: 'Submit Complaint', action: () => { navigate('/submit-complaint'); setIsOpen(false); } },
-    { icon: Search, label: 'Track Complaint', action: () => { navigate('/track-complaint'); setIsOpen(false); } },
+    { icon: FileText, label: 'Submit Complaint', action: () => { navigate('/submit'); setIsOpen(false); } },
+    { icon: Search, label: 'Track Complaint', action: () => { navigate('/track'); setIsOpen(false); } },
     { icon: Phone, label: 'Contact Support', action: () => { navigate('/about'); setIsOpen(false); } },
   ];
 
@@ -600,26 +768,65 @@ export const AIChatbot = () => {
                           <span>You're offline. Messages will be sent when you reconnect.</span>
                         </motion.div>
                       )}
+                      
+                      {/* Voice Listening Indicator */}
+                      {isListening && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex items-center gap-2 text-xs text-primary mb-2 p-2 bg-primary/10 rounded-lg"
+                        >
+                          <Mic className="w-3 h-3 animate-pulse" />
+                          <span>Listening... Speak now</span>
+                        </motion.div>
+                      )}
+                      
+                      {/* Speaking Indicator */}
+                      {isSpeaking && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex items-center gap-2 text-xs text-accent mb-2 p-2 bg-accent/10 rounded-lg"
+                        >
+                          <Sparkles className="w-3 h-3 animate-pulse" />
+                          <span>Speaking...</span>
+                        </motion.div>
+                      )}
+                      
                       <div className="flex gap-2">
                         <Input
                           ref={inputRef}
                           value={input}
                           onChange={(e) => setInput(e.target.value)}
                           onKeyPress={handleKeyPress}
-                          placeholder="Type or speak..."
-                          disabled={isLoading}
+                          placeholder={speechSupported ? "Type or click mic to speak..." : "Type your message..."}
+                          disabled={isLoading || isListening}
                           className="flex-1 bg-muted/50 border-border/50 focus:border-primary/50"
                         />
-                        <VoiceInput
-                          buttonOnly
-                          size="default"
-                          onTranscript={(text) => {
-                            setInput(prev => prev ? `${prev} ${text}` : text);
-                          }}
-                        />
+                        
+                        {/* Voice Toggle Button */}
+                        {speechSupported && (
+                          <Button
+                            onClick={toggleVoiceListening}
+                            disabled={isLoading}
+                            size="icon"
+                            variant={isListening ? "destructive" : "outline"}
+                            className={`shrink-0 transition-all ${
+                              isListening ? 'animate-pulse' : 'hover:bg-primary/10'
+                            }`}
+                            title={isListening ? "Stop listening" : "Start voice input"}
+                          >
+                            {isListening ? (
+                              <MicOff className="w-4 h-4" />
+                            ) : (
+                              <Mic className="w-4 h-4" />
+                            )}
+                          </Button>
+                        )}
+                        
                         <Button
                           onClick={handleSend}
-                          disabled={!input.trim() || isLoading}
+                          disabled={!input.trim() || isLoading || isListening}
                           size="icon"
                           className="shrink-0 bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                         >
@@ -630,7 +837,14 @@ export const AIChatbot = () => {
                           )}
                         </Button>
                       </div>
-                      <div className="flex justify-center mt-2">
+                      
+                      {/* Language Indicator */}
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-[10px] text-muted-foreground">
+                          {detectedLanguage === 'hi-IN' && '🇮🇳 हिंदी'}
+                          {detectedLanguage === 'mr-IN' && '🇮🇳 मराठी'}
+                          {detectedLanguage === 'en-US' && '🇺🇸 English'}
+                        </span>
                         <button
                           onClick={handleClearHistory}
                           className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"

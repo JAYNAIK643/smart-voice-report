@@ -271,7 +271,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Heart, MapPin, Calendar, User } from "lucide-react";
+import { Heart, MapPin, Calendar, User, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 const AllComplaints = () => {
@@ -286,6 +286,10 @@ const AllComplaints = () => {
     category: "all",
     status: "all",
   });
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 9;
 
   // ✅ SAFE FETCH (FIXED)
   const fetchComplaints = async () => {
@@ -321,6 +325,11 @@ const AllComplaints = () => {
 
   useEffect(() => {
     fetchComplaints();
+  }, [filters.sortBy, filters.category, filters.status]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
   }, [filters.sortBy, filters.category, filters.status]);
 
   // ✅ UPVOTE HANDLER - Uses complaintId field from backend
@@ -477,8 +486,11 @@ const AllComplaints = () => {
             <p className="text-gray-500">Try adjusting your filters or check back later</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {complaints.map((c) => (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {complaints
+                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                .map((c) => (
               <Card 
                 key={c._id} 
                 className="transition-all duration-300 hover:scale-[1.02] hover:shadow-xl cursor-pointer"
@@ -547,8 +559,57 @@ const AllComplaints = () => {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {complaints.length > itemsPerPage && (
+              <div className="flex justify-center items-center gap-2 mt-10">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="gap-1"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+
+                <div className="flex gap-1">
+                  {Array.from(
+                    { length: Math.ceil(complaints.length / itemsPerPage) },
+                    (_, i) => i + 1
+                  ).map((pageNum) => (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className="min-w-[40px]"
+                    >
+                      {pageNum}
+                    </Button>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setCurrentPage((p) =>
+                      Math.min(Math.ceil(complaints.length / itemsPerPage), p + 1)
+                    )
+                  }
+                  disabled={currentPage === Math.ceil(complaints.length / itemsPerPage)}
+                  className="gap-1"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -535,4 +535,106 @@ export const apiService = {
       return { success: false, data: null };
     }
   },
+
+  // Contact/Support Messages
+  submitContactMessage: async (messageData) => {
+    try {
+      const response = await fetch(`${API_URL}/contact`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(messageData),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Failed to submit message");
+      return data;
+    } catch (error) {
+      console.error("submitContactMessage error:", error);
+      throw error;
+    }
+  },
+
+  getContactMessages: async (params = {}) => {
+    try {
+      const queryString = new URLSearchParams(params).toString();
+      const url = queryString ? `${API_URL}/contact?${queryString}` : `${API_URL}/contact`;
+      const response = await fetch(url, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Failed to fetch messages");
+      return data;
+    } catch (error) {
+      console.error("getContactMessages error:", error);
+      throw error;
+    }
+  },
+
+  getWardAdminsForAssignment: async () => {
+    try {
+      const response = await fetch(`${API_URL}/contact/ward-admins`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Failed to fetch ward admins");
+      return data;
+    } catch (error) {
+      console.error("getWardAdminsForAssignment error:", error);
+      throw error;
+    }
+  },
+
+  assignContactMessage: async (ticketId, wardAdminId) => {
+    try {
+      const response = await fetch(`${API_URL}/contact/${ticketId}/assign`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ wardAdminId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Failed to assign message");
+      return data;
+    } catch (error) {
+      console.error("assignContactMessage error:", error);
+      throw error;
+    }
+  },
+
+  updateContactMessageStatus: async (ticketId, status) => {
+    try {
+      const response = await fetch(`${API_URL}/contact/ward-admin/${ticketId}/status`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Failed to update status");
+      return data;
+    } catch (error) {
+      console.error("updateContactMessageStatus error:", error);
+      throw error;
+    }
+  },
+
+  getWardAdminContactMessages: async (params = {}) => {
+    try {
+      const queryString = new URLSearchParams(params).toString();
+      const url = queryString
+        ? `${API_URL}/contact/ward-admin/messages?${queryString}`
+        : `${API_URL}/contact/ward-admin/messages`;
+      const response = await fetch(url, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Failed to fetch messages");
+      return data;
+    } catch (error) {
+      console.error("getWardAdminContactMessages error:", error);
+      throw error;
+    }
+  },
 };

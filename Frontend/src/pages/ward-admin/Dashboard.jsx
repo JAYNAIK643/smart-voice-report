@@ -7,6 +7,10 @@ import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import AdvancedAnalytics from "@/components/analytics/AdvancedAnalytics";
 
+// API Configuration for mobile/laptop compatibility
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+const API_URL = `${API_BASE}/api`;
+
 const WardAdminDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -44,7 +48,6 @@ const WardAdminDashboard = () => {
   useEffect(() => {
     const fetchWardData = async () => {
       try {
-        const API_BASE = "http://localhost:3000/api";
         const token = localStorage.getItem("authToken");
         const headers = { 
           "Content-Type": "application/json",
@@ -52,7 +55,7 @@ const WardAdminDashboard = () => {
         };
 
         // Fetch ward complaints
-        const complaintsResponse = await fetch(`${API_BASE}/ward-admin/complaints`, { headers });
+        const complaintsResponse = await fetch(`${API_URL}/ward-admin/complaints`, { headers });
         if (complaintsResponse.ok) {
           const complaintsData = await complaintsResponse.json();
           if (complaintsData.success && Array.isArray(complaintsData.data)) {

@@ -129,7 +129,7 @@ const TrendingIssues = () => {
           viewport={{ once: true, margin: "-50px" }}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
-          {trendingComplaints.map((complaint, index) => (
+          {trendingComplaints.slice(0, 3).map((complaint, index) => (
             <motion.div key={complaint.id} variants={itemVariants}>
               <Card className="group relative overflow-hidden border-border/50 bg-card hover:border-primary/30 hover:shadow-card transition-all duration-300 h-full">
                 {/* Rank Badge */}

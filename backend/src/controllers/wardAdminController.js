@@ -424,7 +424,7 @@ exports.getWardComplaints = async (req, res, next) => {
     // Get complaints for the ward admin's assigned ward
     const complaints = await Grievance.find({ ward: req.user.ward })
       .sort({ createdAt: -1 })
-      .select("complaintId title description category status priority ward createdAt updatedAt imageUrl latitude longitude");
+      .select("complaintId title description category status priority ward createdAt updatedAt imageUrl videoUrl latitude longitude");
 
     console.log(`   ✅ Found ${complaints.length} complaints for ${req.user.ward}`);
     

@@ -36,9 +36,11 @@ import SentimentAnalytics from "./pages/admin/SentimentAnalytics";
 import KPITracker from "./pages/admin/KPITracker";
 import CustomDashboards from "./pages/admin/CustomDashboards";
 import AnalyticsDashboard from "./pages/admin/AnalyticsDashboard";
+import ContactMessages from "./pages/admin/ContactMessages";
 import WardAdminDashboard from "./pages/ward-admin/Dashboard";
 import WardAdminComplaints from "./pages/ward-admin/Complaints";
 import WardAdminWardInfo from "./pages/ward-admin/WardInfo";
+import WardAdminContactMessages from "./pages/ward-admin/ContactMessages";
 import { ComplaintsProvider } from "@/context/complaints-context";
 import { AuthProvider } from "@/context/auth-context";
 import { ThemeProvider } from "@/context/theme-context";
@@ -50,6 +52,7 @@ import BadgeUnlockModal from "@/components/BadgeUnlockModal";
 import FeedbackPrompt from "@/components/FeedbackPrompt";
 import OfflineIndicator from "@/components/mobile/OfflineIndicator";
 import PWAInstallPrompt from "@/components/mobile/PWAInstallPrompt";
+import BottomNav from "@/components/mobile/BottomNav";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +79,7 @@ const AppLayout = ({ children }) => {
       {/* Mobile Experience Enhancements - Non-intrusive, fail-safe */}
       {!hideNavAndFooter && <OfflineIndicator />}
       {!hideNavAndFooter && <PWAInstallPrompt />}
+      {!hideNavAndFooter && <BottomNav />}
     </div>
   );
 };
@@ -119,8 +123,8 @@ const App = () => {
                   <Route path="/verify-ward-admin/:token" element={<VerifyWardAdmin />} />
                   
                   {/* Ward Admin Routes */}
-                  <Route 
-                    path="/ward-admin" 
+                  <Route
+                    path="/ward-admin"
                     element={
                       <ProtectedRoute requireWardAdmin>
                         <WardAdminLayout />
@@ -129,6 +133,7 @@ const App = () => {
                   >
                     <Route path="dashboard" element={<WardAdminDashboard />} />
                     <Route path="complaints" element={<WardAdminComplaints />} />
+                    <Route path="contact-messages" element={<WardAdminContactMessages />} />
                     <Route path="ward-info" element={<WardAdminWardInfo />} />
                   </Route>
                   
@@ -198,6 +203,7 @@ const App = () => {
                     <Route path="kpi-tracker" element={<KPITracker />} />
                     <Route path="custom-dashboards" element={<CustomDashboards />} />
                     <Route path="analytics-dashboard" element={<AnalyticsDashboard />} />
+                    <Route path="contact-messages" element={<ContactMessages />} />
                     <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
                   </Route>
 

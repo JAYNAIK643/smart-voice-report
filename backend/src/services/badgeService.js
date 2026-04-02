@@ -1,8 +1,43 @@
 const User = require("../models/User");
 const Grievance = require("../models/Grievance");
 
-// Badge milestone definitions
+// Badge milestone definitions with benefits and tiers
 const BADGE_DEFINITIONS = [
+  // TIER BADGES - Based on complaints submitted
+  {
+    id: "bronze_contributor",
+    name: "Bronze Contributor",
+    category: "tier",
+    description: "Submit 10+ complaints and earn bronze recognition",
+    requirement: "complaintsSubmitted",
+    value: 10,
+    icon: "🥉",
+    tier: "bronze",
+    benefits: "Standard complaint processing with acknowledgment badge on your profile"
+  },
+  {
+    id: "silver_contributor",
+    name: "Silver Contributor",
+    category: "tier",
+    description: "Submit 25+ complaints and earn silver status",
+    requirement: "complaintsSubmitted",
+    value: 25,
+    icon: "🥈",
+    tier: "silver",
+    benefits: "Slightly faster response times + priority acknowledgment from ward officers"
+  },
+  {
+    id: "gold_contributor",
+    name: "Gold Contributor",
+    category: "tier",
+    description: "Submit 50+ complaints and earn gold status",
+    requirement: "complaintsSubmitted",
+    value: 50,
+    icon: "🥇",
+    tier: "gold",
+    benefits: "High priority complaint handling + direct escalation channel to senior officials"
+  },
+  // ENGAGEMENT BADGES
   {
     id: "first_report",
     name: "First Report",
@@ -11,6 +46,8 @@ const BADGE_DEFINITIONS = [
     requirement: "complaintsSubmitted",
     value: 1,
     icon: "🎯",
+    tier: "basic",
+    benefits: "Welcome to the platform - your voice matters!"
   },
   {
     id: "active_citizen",
@@ -20,6 +57,8 @@ const BADGE_DEFINITIONS = [
     requirement: "complaintsSubmitted",
     value: 5,
     icon: "⭐",
+    tier: "basic",
+    benefits: "Your activity is being recognized by the system"
   },
   {
     id: "veteran_reporter",
@@ -29,6 +68,8 @@ const BADGE_DEFINITIONS = [
     requirement: "complaintsSubmitted",
     value: 10,
     icon: "🏆",
+    tier: "bronze",
+    benefits: "Your consistent participation helps improve city services"
   },
   {
     id: "super_reporter",
@@ -38,7 +79,10 @@ const BADGE_DEFINITIONS = [
     requirement: "complaintsSubmitted",
     value: 25,
     icon: "💎",
+    tier: "silver",
+    benefits: "Recognition as a valued community contributor"
   },
+  // IMPACT BADGES - Based on resolved complaints
   {
     id: "problem_solver",
     name: "Problem Solver",
@@ -47,6 +91,8 @@ const BADGE_DEFINITIONS = [
     requirement: "complaintsResolved",
     value: 3,
     icon: "✅",
+    tier: "bronze",
+    benefits: "Your reports are creating real change in your community"
   },
   {
     id: "community_hero",
@@ -56,6 +102,8 @@ const BADGE_DEFINITIONS = [
     requirement: "complaintsResolved",
     value: 10,
     icon: "🦸",
+    tier: "silver",
+    benefits: "Special recognition from municipal authorities + certificate of appreciation"
   },
   {
     id: "change_maker",
@@ -65,35 +113,44 @@ const BADGE_DEFINITIONS = [
     requirement: "complaintsResolved",
     value: 20,
     icon: "🌟",
+    tier: "gold",
+    benefits: "Official commendation + invitation to citizen advisory meetings"
   },
+  // ENGAGEMENT - Upvotes
   {
     id: "popular_voice",
     name: "Popular Voice",
     category: "engagement",
-    description: "Receive 10 upvotes",
+    description: "Receive 10 upvotes from community",
     requirement: "upvotesReceived",
     value: 10,
     icon: "👍",
+    tier: "bronze",
+    benefits: "Community-endorsed reporter status"
   },
   {
     id: "community_favorite",
     name: "Community Favorite",
     category: "engagement",
-    description: "Receive 50 upvotes",
+    description: "Receive 50 upvotes from community",
     requirement: "upvotesReceived",
     value: 50,
     icon: "❤️",
+    tier: "gold",
+    benefits: "Featured citizen spotlight + priority issue attention"
   },
   {
     id: "supporter",
     name: "Supporter",
     category: "engagement",
-    description: "Give 20 upvotes",
+    description: "Support others by giving 20 upvotes",
     requirement: "upvotesGiven",
     value: 20,
     icon: "🤝",
+    tier: "bronze",
+    benefits: "Community builder recognition badge"
   },
-  // Advanced Engagement System - Streak-Based Badges
+  // STREAK BADGES - Activity consistency
   {
     id: "streak_starter",
     name: "Streak Starter",
@@ -102,6 +159,8 @@ const BADGE_DEFINITIONS = [
     requirement: "currentStreak",
     value: 3,
     icon: "🔥",
+    tier: "basic",
+    benefits: "Building a habit of civic engagement"
   },
   {
     id: "week_warrior",
@@ -111,6 +170,8 @@ const BADGE_DEFINITIONS = [
     requirement: "currentStreak",
     value: 7,
     icon: "⚡",
+    tier: "bronze",
+    benefits: "Consistent citizen badge + bonus points on leaderboard"
   },
   {
     id: "dedicated_citizen",
@@ -120,6 +181,8 @@ const BADGE_DEFINITIONS = [
     requirement: "currentStreak",
     value: 14,
     icon: "💪",
+    tier: "silver",
+    benefits: "Dedicated citizen certificate + early access to new features"
   },
   {
     id: "consistency_champion",
@@ -129,6 +192,8 @@ const BADGE_DEFINITIONS = [
     requirement: "currentStreak",
     value: 30,
     icon: "🏅",
+    tier: "gold",
+    benefits: "Champion status + municipal appreciation letter"
   },
   {
     id: "unstoppable",
@@ -138,6 +203,31 @@ const BADGE_DEFINITIONS = [
     requirement: "longestStreak",
     value: 60,
     icon: "🌟",
+    tier: "platinum",
+    benefits: "VIP citizen status + direct communication channel with city officials"
+  },
+  // SPECIAL BADGES - Top performers
+  {
+    id: "top_contributor",
+    name: "Top Contributor",
+    category: "special",
+    description: "Reach Top 10 on the leaderboard",
+    requirement: "leaderboardRank",
+    value: 10,
+    icon: "👑",
+    tier: "platinum",
+    benefits: "Featured profile + fastest admin response times + monthly recognition"
+  },
+  {
+    id: "trusted_citizen",
+    name: "Trusted Citizen",
+    category: "special",
+    description: "Verified user with no fake/spam complaints",
+    requirement: "trustScore",
+    value: 90,
+    icon: "🛡️",
+    tier: "platinum",
+    benefits: "Verified badge displayed + priority support + complaints auto-verified"
   },
 ];
 

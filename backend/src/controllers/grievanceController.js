@@ -2,6 +2,7 @@ const Grievance = require("../models/Grievance");
 const User = require("../models/User");
 const AuditLog = require("../models/AuditLog");
 const notificationManager = require("../services/notificationManager");
+const imageValidationService = require("../services/imageValidationService");
 
 /**
  * Get a single grievance by complaint ID (for public tracking)
@@ -69,7 +70,7 @@ const logStatusChange = async (grievance, oldStatus, newStatus, user) => {
  */
 exports.createGrievance = async (req, res, next) => {
   try {
-    const { title, description, category, location, address, priority, anonymous, ward, imageUrl, latitude, longitude } =
+    const { title, description, category, location, address, priority, anonymous, ward, imageUrl, videoUrl, latitude, longitude } =
       req.body;
 
     console.log("\n" + "=".repeat(70));
@@ -124,8 +125,46 @@ exports.createGrievance = async (req, res, next) => {
     console.log(`   🎯 WARD (from req.body): ${ward}`);
     console.log(`   📍 Geolocation: ${latitude}, ${longitude}`);
     console.log(`   🖼️ Image: ${imageUrl ? 'Provided' : 'None'}`);
+    console.log(`   🎥 Video: ${videoUrl ? 'Provided' : 'None'}`);
     console.log(`   User ID: ${req.user.id}`);
     console.log("=".repeat(70) + "\n");
+
+    // ========== IMAGE VALIDATION ==========
+    let imageValidationResult = { isValid: true, warnings: [], validatedAt: new Date() };
+    let imageHashValue = null;
+    
+    if (imageUrl) {
+      console.log("🔍 IMAGE VALIDATION: Starting validation...");
+      
+      const imageValidation = await imageValidationService.validateImage(imageUrl, category);
+      
+      console.log(`   Image Hash: ${imageValidation.imageHash || 'N/A'}`);
+      console.log(`   Validation Result: ${imageValidation.isValid ? 'VALID' : 'INVALID'}`);
+      
+      if (!imageValidation.isValid) {
+        console.log(`   ❌ BLOCKED: ${imageValidation.errors.join(', ')}`);
+        return res.status(400).json({
+          success: false,
+          message: imageValidation.errors[0],
+          errorType: 'IMAGE_VALIDATION_FAILED',
+          errors: imageValidation.errors
+        });
+      }
+      
+      if (imageValidation.warnings.length > 0) {
+        console.log(`   ⚠️ Warnings: ${imageValidation.warnings.join(', ')}`);
+      }
+      
+      // Store validation results with the grievance
+      imageValidationResult = {
+        isValid: imageValidation.isValid,
+        warnings: imageValidation.warnings,
+        validatedAt: new Date()
+      };
+      imageHashValue = imageValidation.imageHash;
+      
+      console.log("✅ IMAGE VALIDATION: Passed\n");
+    }
 
     const grievanceData = {
       complaintId,
@@ -139,8 +178,12 @@ exports.createGrievance = async (req, res, next) => {
       anonymous: anonymous === true,
       // Image and Geolocation (optional - backward compatible)
       imageUrl: imageUrl || null,
+      videoUrl: videoUrl || null,
       latitude: latitude || null,
       longitude: longitude || null,
+      // Image validation data
+      imageHash: imageHashValue || null,
+      imageValidation: imageValidationResult || { isValid: true, warnings: [], validatedAt: new Date() },
     };
 
     const grievance = new Grievance(grievanceData);

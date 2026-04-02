@@ -172,6 +172,7 @@ import {
   Target,
   Layout,
   PieChart,
+  Mail,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 
@@ -191,6 +192,7 @@ const AdminSidebar = () => {
     { icon: Target, label: "KPI Tracker", path: "/admin/kpi-tracker" },
     { icon: Layout, label: "Custom Dashboards", path: "/admin/custom-dashboards" },
     { icon: PieChart, label: "Analytics Dashboard", path: "/admin/analytics-dashboard" },
+    { icon: Mail, label: "Contact Messages", path: "/admin/contact-messages" },
     { icon: MessageSquare, label: "Feedback", path: "/admin/feedback" },
     { icon: Settings, label: "Settings", path: "/admin/settings" },
   ];

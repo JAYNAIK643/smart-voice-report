@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
+const path = require("path");
 
 const authRoutes = require("./routes/authRoutes");
 const twoFactorAuthRoutes = require("./routes/twoFactorAuthRoutes");
@@ -23,6 +24,9 @@ const heatmapRoutes = require("./routes/heatmapRoutes");
 const smartRoutingRoutes = require("./routes/smartRoutingRoutes");
 const transparencyRoutes = require("./routes/transparencyRoutes");
 const aiRoutes = require("./routes/aiRoutes"); // NEW: AI categorization and chatbot
+const contactRoutes = require("./routes/contactRoutes"); // Contact/Support messages
+const imageRoutes = require("./routes/imageRoutes"); // Image upload and validation
+const videoRoutes = require("./routes/videoRoutes"); // Video upload
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
@@ -31,10 +35,35 @@ const app = express();
 app.disable("etag");
 app.set("etag", false);
 
-app.use(cors());
+// ✅ CORS CONFIGURATION - Allow requests from any origin (for mobile/local network)
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    // and any localhost or local network origin
+    if (!origin || 
+        origin.includes('localhost') || 
+        origin.includes('127.0.0.1') ||
+        /^http:\/\/192\.168\./.test(origin) ||
+        /^http:\/\/10\./.test(origin) ||
+        /^http:\/\/172\.(1[6-9]|2[0-9]|3[01])\./.test(origin)) {
+      callback(null, true);
+    } else {
+      // In production, you might want to restrict this
+      callback(null, true); // Allow all for now (development mode)
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '2mb' })); // Increased limit for base64 image uploads (1MB + 33% base64 overhead)
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(morgan("dev"));
+
+// Serve static files from uploads directory
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
@@ -63,6 +92,9 @@ app.use("/api/heatmap", heatmapRoutes); // Heatmap & SLA Analytics (Phase 2)
 app.use("/api/routing", smartRoutingRoutes); // Smart Routing (Phase 3)
 app.use("/api/transparency", transparencyRoutes); // Public Transparency (Phase 4)
 app.use("/api/ai", aiRoutes); // NEW: AI categorization and chatbot (replaces Supabase functions)
+app.use("/api/contact", contactRoutes); // Contact/Support messages
+app.use("/api/image", imageRoutes); // Image upload and validation with Roboflow
+app.use("/api/video", videoRoutes); // Video upload
 
 app.use(notFound);
 app.use(errorHandler);

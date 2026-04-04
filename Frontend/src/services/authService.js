@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000/api/auth";
+const API_URL = import.meta.env.VITE_BACKEND_URL + "/api/auth";
 
 export const authService = {
   signup: async (name, email, password, role = "user") => {

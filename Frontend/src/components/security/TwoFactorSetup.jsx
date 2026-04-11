@@ -9,100 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
 
-// Get backend URL from environment variable
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
-
-const TwoFactorVerify = ({ userId, email, onVerified, onBack }) => {
-  const [verificationCode, setVerificationCode] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [useBackupCode, setUseBackupCode] = useState(false);
-
-  const handleVerify = async (e) => {
-    e.preventDefault();
-
-    const codeLength = useBackupCode ? 8 : 6;
-    if (verificationCode.length !== codeLength) {
-      toast({
-        title: "Invalid Code",
-        description: `Please enter a ${codeLength}-character ${useBackupCode ? "backup code" : "verification code"}`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-    console.log("🔐 Verifying 2FA code...", { userId, codeLength, useBackupCode });
-    
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/auth/2fa/verify`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId,
-          token: verificationCode,
-        }),
-      });
-
-      const data = await response.json();
-      console.log("🔐 2FA verification response:", { success: data.success, hasToken: !!data.data?.token });
-
-      if (data.success) {
-        // Save auth token and user data
-        if (data.data?.token) {
-          localStorage.setItem("authToken", data.data.token);
-          localStorage.setItem("user", JSON.stringify(data.data.user));
-          console.log("✅ Token and user saved to localStorage", { 
-            role: data.data.user.role,
-            email: data.data.user.email 
-          });
-        }
-
-        toast({
-          title: "Verification Successful",
-          description: "Logging you in...",
-        });
-        
-        if (data.warning) {
-          toast({
-            title: "Warning",
-            description: data.warning,
-            variant: "warning",
-          });
-        }
-
-        // Call parent callback to complete login
-        if (onVerified) {
-          console.log("🔐 Calling onVerified callback...");
-          onVerified();
-        }
-      } else {
-        console.error("❌ 2FA verification failed:", data.message);
-        toast({
-          title: "Verification Failed",
-          description: data.message || "Invalid verification code",
-          variant: "destructive",
-        });
-        setVerificationCode("");
-      }
-    } catch (error) {
-      console.error("❌ 2FA verification error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to verify 2FA code",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
 /**
  * 2FA Setup Component
  * Handles the setup process for Two-Factor Authentication
  */
-/*
+
 const TwoFactorSetup = ({ onSetupComplete, setupToken }) => {
   const [step, setStep] = useState(1); // 1: QR Code, 2: Verify, 3: Backup Codes
   const [qrCode, setQrCode] = useState(null);
@@ -213,7 +124,7 @@ const TwoFactorSetup = ({ onSetupComplete, setupToken }) => {
     } finally {
       setLoading(false);
     }
-  }; */
+  };
 
   const handleCopySecret = () => {
     navigator.clipboard.writeText(secret);

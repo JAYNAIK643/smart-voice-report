@@ -1,5 +1,6 @@
 // MongoDB Backend API service
-const API_URL = import.meta.env.VITE_BACKEND_URL + "/api";
+const API_URL = import.meta.env.VITE_BACKEND_URL;
+
 
 const getAuthToken = () => {
   return localStorage.getItem("authToken");
@@ -17,7 +18,7 @@ export const apiService = {
   // User Profile & Stats
   getUserProfile: async () => {
     try {
-      const response = await fetch(`${API_URL}/users/profile`, {
+      const response = await fetch(`${API_URL}/api/users/profile`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -32,7 +33,7 @@ export const apiService = {
 
   getUserBadges: async () => {
     try {
-      const response = await fetch(`${API_URL}/users/badges`, {
+      const response = await fetch(`${API_URL}/api/users/badges`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -47,7 +48,7 @@ export const apiService = {
 
   getUserStats: async () => {
     try {
-      const response = await fetch(`${API_URL}/users/stats`, {
+      const response = await fetch(`${API_URL}/api/users/stats`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -204,7 +205,7 @@ export const apiService = {
 
   getRecentActivity: async (limit = 10) => {
     try {
-      const response = await fetch(`${API_URL}/users/recent-activity?limit=${limit}`, {
+      const response = await fetch(`${API_URL}/api/users/recent-activity?limit=${limit}`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -445,7 +446,7 @@ export const apiService = {
 
   updateNotificationPreferences: async (preferences) => {
     try {
-      const response = await fetch(`${API_URL}/users/preferences`, {
+      const response = await fetch(`${API_URL}/api/users/preferences`, {
         method: "PATCH",
         headers: getAuthHeaders(),
         body: JSON.stringify(preferences),

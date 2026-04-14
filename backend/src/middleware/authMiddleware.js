@@ -32,10 +32,16 @@ const authenticateUser = async (req, res, next) => {
       if (!user) {
         return res.status(401).json({ success: false, message: "Admin not found" });
       }
+      if (!user.role) {
+        user.role = "admin";
+      }
     } else if (normalizedRole === "ward_admin") {
       user = await WardAdmin.findById(decodedId).select("-password");
       if (!user) {
         return res.status(401).json({ success: false, message: "Ward Admin not found" });
+      }
+      if (!user.role) {
+        user.role = "ward_admin";
       }
     } else {
       // Default to User collection for citizens
@@ -52,6 +58,7 @@ const authenticateUser = async (req, res, next) => {
     }
 
     req.user = user;
+    req.authRole = normalizedRole;
     console.log("👤 req.user:", req.user ? { id: req.user._id, email: req.user.email, role: req.user.role } : null);
     console.log("👤 req.user.id:", req.user?.id || req.user?._id);
     next();
@@ -66,10 +73,13 @@ const authenticateUser = async (req, res, next) => {
  */
 const authorizeRoles = (allowedRoles) => {
   return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
+    const normalizedAllowedRoles = allowedRoles.map((role) => String(role).toLowerCase());
+    const effectiveRole = String(req.user?.role || req.authRole || "").toLowerCase();
+
+    if (!req.user || !normalizedAllowedRoles.includes(effectiveRole)) {
       return res.status(403).json({ 
         success: false, 
-        message: `Role (${req.user?.role}) is not authorized to access this resource` 
+        message: `Role (${req.user?.role || req.authRole}) is not authorized to access this resource` 
       });
     }
     next();

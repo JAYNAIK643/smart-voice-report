@@ -18,24 +18,28 @@ const authenticateUser = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const normalizedRole = String(decoded.role || "").toLowerCase();
+    const decodedId = decoded.id || decoded._id;
     console.log("🔐 Decoded token role:", decoded.role);
+    console.log("🔐 Decoded token id:", decodedId);
     
     let user = null;
 
     // Check appropriate collection based on role in token
-    if (decoded.role === "admin") {
-      user = await Admin.findById(decoded.id).select("-password");
+    if (normalizedRole === "admin") {
+      user = await Admin.findById(decodedId).select("-password");
+      console.log("🔎 Admin fetched from DB:", user ? { id: user._id, email: user.email, role: user.role } : null);
       if (!user) {
         return res.status(401).json({ success: false, message: "Admin not found" });
       }
-    } else if (decoded.role === "ward_admin") {
-      user = await WardAdmin.findById(decoded.id).select("-password");
+    } else if (normalizedRole === "ward_admin") {
+      user = await WardAdmin.findById(decodedId).select("-password");
       if (!user) {
         return res.status(401).json({ success: false, message: "Ward Admin not found" });
       }
     } else {
       // Default to User collection for citizens
-      user = await User.findById(decoded.id).select("-password");
+      user = await User.findById(decodedId).select("-password");
       if (!user) {
         return res.status(401).json({ success: false, message: "User not found" });
       }
@@ -48,6 +52,8 @@ const authenticateUser = async (req, res, next) => {
     }
 
     req.user = user;
+    console.log("👤 req.user:", req.user ? { id: req.user._id, email: req.user.email, role: req.user.role } : null);
+    console.log("👤 req.user.id:", req.user?.id || req.user?._id);
     next();
   } catch (error) {
     return res.status(401).json({ success: false, message: "Invalid or expired token" });

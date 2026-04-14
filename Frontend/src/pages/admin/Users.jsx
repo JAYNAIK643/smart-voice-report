@@ -99,7 +99,7 @@ const Users = () => {
     
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch("http://localhost:3000/api/ward-admin/invite", {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/ward-admin/invite`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,

@@ -58,6 +58,7 @@ exports.register = async (req, res, next) => {
     // Create JWT token with the user role
     const tokenPayload = {
       id: user._id,
+      email: user.email,
       role: "user",  // Since we're registering a citizen user
       ward: user.ward
     };
@@ -158,7 +159,7 @@ exports.login = async (req, res, next) => {
       if (!has2FAEnabled) {
         // User needs to set up 2FA - issue a temporary setup token
         const setupToken = jwt.sign(
-          { id: user._id, role: userRole, setup2FA: true },
+          { id: user._id, email: user.email, role: userRole, setup2FA: true },
           process.env.JWT_SECRET,
           { expiresIn: "15m" } // Short expiry for setup token
         );
@@ -192,6 +193,7 @@ exports.login = async (req, res, next) => {
     // Create JWT token with the determined role
     const tokenPayload = {
       id: user._id,
+      email: user.email,
       role: userRole,
       ward: user.ward
     };

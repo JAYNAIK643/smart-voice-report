@@ -202,36 +202,75 @@ console.log("📧 emailService.js loaded");
 
 const nodemailer = require("nodemailer");
 
-// Create email transporter (supports both Gmail and SendGrid)
-const createTransporter = () => {
-  // Option 1: SendGrid (recommended - no 2FA needed)
+const createSendGridTransporter = () => {
+  if (!process.env.SENDGRID_API_KEY) return null;
+  return nodemailer.createTransport({
+    host: "smtp.sendgrid.net",
+    port: 587,
+    secure: false,
+    auth: {
+      user: "apikey",
+      pass: process.env.SENDGRID_API_KEY,
+    },
+  });
+};
+
+const createGmailTransporter = () => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null;
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+};
+
+const getAvailableProviders = () => {
+  const providers = [];
   if (process.env.SENDGRID_API_KEY) {
-    console.log("📧 Using SendGrid for email delivery");
-    return nodemailer.createTransport({
-      host: "smtp.sendgrid.net",
-      port: 587,
-      secure: false,
-      auth: {
-        user: "apikey",
-        pass: process.env.SENDGRID_API_KEY,
-      },
-    });
+    providers.push({ name: "SendGrid", transporter: createSendGridTransporter() });
   }
-
-  // Option 2: Gmail SMTP (requires App Password)
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    console.log("📧 Using Gmail SMTP for email delivery");
-    return nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    providers.push({ name: "Gmail", transporter: createGmailTransporter() });
+  }
+  return providers.filter((p) => !!p.transporter);
+};
+
+const getSenderAddress = () =>
+  process.env.EMAIL_FROM ||
+  process.env.SENDGRID_FROM_EMAIL ||
+  process.env.EMAIL_USER ||
+  "SmartCity GRS <noreply@smartcityportal.com>";
+
+const sendEmailWithFallback = async (mailOptions) => {
+  const providers = getAvailableProviders();
+  console.log("📧 Email provider config:", {
+    hasSendGridKey: !!process.env.SENDGRID_API_KEY,
+    hasEmailUser: !!process.env.EMAIL_USER,
+    hasEmailPass: !!process.env.EMAIL_PASS,
+    sender: getSenderAddress(),
+    availableProviders: providers.map((p) => p.name),
+  });
+
+  if (providers.length === 0) {
+    return { success: false, error: "Email service not configured (missing SMTP credentials)" };
   }
 
-  console.warn("⚠️ No email service configured. Set SENDGRID_API_KEY or EMAIL_USER/EMAIL_PASS.");
-  return null;
+  let lastError = null;
+  for (const provider of providers) {
+    try {
+      console.log(`📧 Attempting email send via ${provider.name}`);
+      await provider.transporter.sendMail(mailOptions);
+      console.log(`✅ Email sent via ${provider.name}`);
+      return { success: true, provider: provider.name };
+    } catch (err) {
+      lastError = err;
+      console.error(`EMAIL ERROR (${provider.name}):`, err.message);
+    }
+  }
+
+  return { success: false, error: lastError?.message || "Unknown email delivery error" };
 };
 
 // Email template helper function
@@ -359,13 +398,6 @@ const sendGrievanceConfirmation = async (userEmail, grievanceData) => {
   console.log(`   Title: ${grievanceData.title}`);
   console.log(`   Priority: ${grievanceData.priority || 'not provided'}`);
   
-  const transporter = createTransporter();
-
-  if (!transporter) {
-    console.log("📧 Email skipped: transporter not available");
-    return { success: false };
-  }
-
   const content = `
     <p style="margin: 0 0 30px; font-size: 16px; line-height: 1.6;">Your grievance has been successfully submitted to the Smart City Grievance Redressal System. Our team will review and address it as soon as possible.</p>
     
@@ -389,7 +421,7 @@ const sendGrievanceConfirmation = async (userEmail, grievanceData) => {
   });
 
   const mailOptions = {
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    from: getSenderAddress(),
     to: userEmail,
     subject: `Grievance Registered Successfully - ID: ${grievanceData.complaintId}`,
     html: html,
@@ -397,12 +429,16 @@ const sendGrievanceConfirmation = async (userEmail, grievanceData) => {
 
   try {
     console.log(`📧 Sending grievance confirmation email to: ${userEmail}`);
-    await transporter.sendMail(mailOptions);
+    const emailResult = await sendEmailWithFallback(mailOptions);
+    if (!emailResult.success) {
+      console.error("EMAIL ERROR:", emailResult.error);
+      return { success: false, error: emailResult.error };
+    }
     console.log("✅ Grievance confirmation email sent successfully to:", userEmail);
     return { success: true };
   } catch (error) {
     console.error("❌ Grievance confirmation email sending failed:", error.message);
-    return { success: false };
+    return { success: false, error: error.message };
   }
 };
 
@@ -415,13 +451,6 @@ const sendStatusUpdateEmail = async (userEmail, grievanceData) => {
   console.log(`   Title: ${grievanceData.title}`);
   console.log(`   Status: ${grievanceData.status}`);
   
-  const transporter = createTransporter();
-
-  if (!transporter) {
-    console.log("📧 Status email skipped");
-    return { success: false };
-  }
-
   // Dynamic content based on status
   let statusMessage = '';
   if (grievanceData.status === 'resolved') {
@@ -440,7 +469,7 @@ const sendStatusUpdateEmail = async (userEmail, grievanceData) => {
   });
 
   const mailOptions = {
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    from: getSenderAddress(),
     to: userEmail,
     subject: `Grievance Status Updated - ID: ${grievanceData.complaintId}`,
     html: html,
@@ -448,12 +477,16 @@ const sendStatusUpdateEmail = async (userEmail, grievanceData) => {
 
   try {
     console.log(`📧 Sending status update email to: ${userEmail}`);
-    await transporter.sendMail(mailOptions);
+    const emailResult = await sendEmailWithFallback(mailOptions);
+    if (!emailResult.success) {
+      console.error("EMAIL ERROR:", emailResult.error);
+      return { success: false, error: emailResult.error };
+    }
     console.log("✅ Status update email sent to:", userEmail);
     return { success: true };
   } catch (error) {
     console.error("❌ Status email failed:", error.message);
-    return { success: false };
+    return { success: false, error: error.message };
   }
 };
 
@@ -461,15 +494,8 @@ const sendStatusUpdateEmail = async (userEmail, grievanceData) => {
  * Send Ward Admin invitation email
  */
 const sendWardAdminInvitationEmail = async (userEmail, userName, ward, verificationLink) => {
-  const transporter = createTransporter();
-
-  if (!transporter) {
-    console.log("📧 Ward Admin invitation email skipped: transporter not available");
-    return { success: false };
-  }
-
   const mailOptions = {
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    from: getSenderAddress(),
     to: userEmail,
     subject: `Ward Admin Invitation - ${ward} | SmartCity GRS`,
     html: `<!DOCTYPE html>
@@ -647,11 +673,16 @@ const sendWardAdminInvitationEmail = async (userEmail, userName, ward, verificat
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    console.log(`📧 Sending ward admin invitation email to: ${userEmail}`);
+    const emailResult = await sendEmailWithFallback(mailOptions);
+    if (!emailResult.success) {
+      console.error("EMAIL ERROR:", emailResult.error);
+      return { success: false, error: emailResult.error };
+    }
     console.log("✅ Ward Admin invitation email sent successfully to:", userEmail);
     return { success: true };
   } catch (error) {
-    console.error("❌ Ward Admin invitation email failed:", error.message);
+    console.error("EMAIL ERROR:", error.message);
     return { success: false, error: error.message };
   }
 };
@@ -665,15 +696,8 @@ const sendCriticalAlert = async (userEmail, alertData) => {
   console.log(`   Complaint ID: ${alertData.complaintId || 'not provided'}`);
   console.log(`   Message: ${alertData.message}`);
   
-  const transporter = createTransporter();
-
-  if (!transporter) {
-    console.log("📧 Critical alert email skipped");
-    return { success: false };
-  }
-
   const mailOptions = {
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    from: getSenderAddress(),
     to: userEmail,
     subject: `🚨 CRITICAL ALERT: ${alertData.title}`,
     html: `
@@ -742,12 +766,16 @@ const sendCriticalAlert = async (userEmail, alertData) => {
 
   try {
     console.log(`📧 Sending critical alert email to: ${userEmail}`);
-    await transporter.sendMail(mailOptions);
+    const emailResult = await sendEmailWithFallback(mailOptions);
+    if (!emailResult.success) {
+      console.error("EMAIL ERROR:", emailResult.error);
+      return { success: false, error: emailResult.error };
+    }
     console.log("✅ Critical alert email sent to:", userEmail);
     return { success: true };
   } catch (error) {
     console.error("❌ Critical alert email failed:", error.message);
-    return { success: false };
+    return { success: false, error: error.message };
   }
 };
 

@@ -14,6 +14,13 @@ const { sendWardAdminInvitationEmail } = require("../services/emailService");
 exports.createWardAdminInvitation = async (req, res, next) => {
   try {
     const { name, email, ward } = req.body;
+    console.log("📨 INVITE REQUEST received:", {
+      requestedBy: req.user?._id,
+      requesterEmail: req.user?.email,
+      requesterRole: req.user?.role,
+      inviteEmail: email,
+      ward,
+    });
 
     // Validate required fields
     if (!name || !email || !ward) {
@@ -66,21 +73,30 @@ exports.createWardAdminInvitation = async (req, res, next) => {
       token,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
     });
+    console.log("✅ Invitation record created:", {
+      invitationId: invitation._id,
+      email: invitation.email,
+      ward: invitation.ward,
+      expiresAt: invitation.expiresAt,
+    });
 
     // Send invitation email
+    console.log("📧 Triggering ward admin invitation email send...");
     const emailResult = await sendWardAdminInvitationEmail(
       email,
       name,
       ward,
       `${process.env.FRONTEND_URL || "http://localhost:8080"}/verify-ward-admin/${token}`
     );
+    console.log("📧 Invitation email result:", emailResult);
 
     if (!emailResult.success) {
       // If email fails, delete the invitation
       await WardAdminInvitation.findByIdAndDelete(invitation._id);
+      console.log("🗑️ Invitation deleted due to email failure:", invitation._id);
       return res.status(500).json({
         success: false,
-        message: "Failed to send invitation email. Please try again.",
+        message: `Failed to send invitation email. ${emailResult.error || "Please verify email service configuration and try again."}`,
       });
     }
 
@@ -360,7 +376,7 @@ exports.resendInvitation = async (req, res, next) => {
     if (!emailResult.success) {
       return res.status(500).json({
         success: false,
-        message: "Failed to send invitation email",
+        message: `Failed to send invitation email. ${emailResult.error || "Please verify email service configuration and try again."}`,
       });
     }
 

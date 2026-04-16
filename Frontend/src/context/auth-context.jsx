@@ -6,6 +6,24 @@ import { createContext, useContext, useState, useEffect } from "react";
 import { authService } from "@/services/authService";
 
 const AuthContext = createContext(undefined);// ye ek container hai jisme user data store hoga
+
+const parseJwtPayload = (token) => {
+  try {
+    const payloadBase64 = token.split(".")[1];
+    if (!payloadBase64) return null;
+    const payloadJson = atob(payloadBase64.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(payloadJson);
+  } catch (error) {
+    return null;
+  }
+};
+
+const hasRequiredAuthClaims = (token) => {
+  const payload = parseJwtPayload(token);
+  if (!payload) return false;
+  return Boolean(payload.id && payload.email && payload.role);
+};
+
 // AuthProvider Component
 export const AuthProvider = ({ children }) => { //Jo bhi component inside hoga → wo auth data access kar sakta hai
   const [user, setUser] = useState(null);
@@ -22,10 +40,15 @@ export const AuthProvider = ({ children }) => { //Jo bhi component inside hoga �
     });
     const token = authService.getToken();
     const storedUser = authService.getStoredUser();
+    const tokenHasRequiredClaims = token ? hasRequiredAuthClaims(token) : false;
 
-    if (token && storedUser) {
+    if (token && storedUser && tokenHasRequiredClaims) {
       console.log('✅ AuthContext - User found in storage:', storedUser);
       setUser(storedUser);
+    } else if (token && !tokenHasRequiredClaims) {
+      console.log("⚠️ AuthContext - Token missing required claims (id/email/role). Clearing stale auth.");
+      authService.logout();
+      setUser(null);
     } else {
       console.log('❌ AuthContext - No user in storage');
       setUser(null);

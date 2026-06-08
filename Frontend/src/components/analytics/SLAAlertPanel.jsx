@@ -18,11 +18,12 @@ const SLAAlertPanel = () => {
   const fetchSLAData = async () => {
     try {
       const token = localStorage.getItem("authToken");
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
       const [alertsRes, compRes] = await Promise.all([
-        fetch("http://localhost:3000/api/heatmap/sla-alerts", {
+        fetch(`${BACKEND_URL}/api/heatmap/sla-alerts`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        fetch("http://localhost:3000/api/heatmap/sla-compliance", {
+        fetch(`${BACKEND_URL}/api/heatmap/sla-compliance`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);

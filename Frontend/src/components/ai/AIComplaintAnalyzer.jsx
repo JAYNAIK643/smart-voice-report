@@ -49,7 +49,8 @@ const AIComplaintAnalyzer = ({
 
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch("http://localhost:3000/api/ai/analyze-complaint", {
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+      const response = await fetch(`${BACKEND_URL}/api/ai/analyze-complaint`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

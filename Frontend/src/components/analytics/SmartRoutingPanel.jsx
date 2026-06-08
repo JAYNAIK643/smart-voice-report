@@ -24,7 +24,8 @@ const SmartRoutingPanel = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch("http://localhost:3000/api/routing/analyze", {
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+      const response = await fetch(`${BACKEND_URL}/api/routing/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

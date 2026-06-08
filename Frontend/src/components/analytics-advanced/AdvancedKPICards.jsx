@@ -18,7 +18,8 @@ const AdvancedKPICards = () => {
     const fetchAdvancedMetrics = async () => {
       try {
         const token = localStorage.getItem("authToken");
-        const response = await fetch("http://localhost:3000/api/analytics-advanced/advanced-metrics", {
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+        const response = await fetch(`${BACKEND_URL}/api/analytics-advanced/advanced-metrics`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         

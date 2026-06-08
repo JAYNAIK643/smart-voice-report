@@ -64,7 +64,7 @@ export const apiService = {
   // Leaderboard
   getLeaderboard: async (timeframe = "all") => {
     try {
-      const response = await fetch(`${API_URL}/leaderboard?timeframe=${timeframe}`, {
+      const response = await fetch(`${API_URL}/api/leaderboard?timeframe=${timeframe}`, {
         method: "GET",
       });
       const data = await response.json();
@@ -78,7 +78,7 @@ export const apiService = {
 
   getLeaderboardStats: async (timeframe = "all") => {
     try {
-      const response = await fetch(`${API_URL}/leaderboard/stats?timeframe=${timeframe}`, {
+      const response = await fetch(`${API_URL}/api/leaderboard/stats?timeframe=${timeframe}`, {
         method: "GET",
       });
       const data = await response.json();
@@ -93,7 +93,7 @@ export const apiService = {
   // Grievances
   createGrievance: async (grievanceData) => {
     try {
-      const response = await fetch(`${API_URL}/grievances`, {
+      const response = await fetch(`${API_URL}/api/grievances`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify(grievanceData),
@@ -109,7 +109,7 @@ export const apiService = {
 
   getMyGrievances: async () => {
     try {
-      const response = await fetch(`${API_URL}/grievances/my`, {
+      const response = await fetch(`${API_URL}/api/grievances/my`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -124,7 +124,7 @@ export const apiService = {
 
   getAllGrievances: async () => {
     try {
-      const response = await fetch(`${API_URL}/grievances`, {
+      const response = await fetch(`${API_URL}/api/grievances`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -142,7 +142,7 @@ export const apiService = {
       const body = { status };
       if (priority) body.priority = priority;
       
-      const response = await fetch(`${API_URL}/grievances/${grievanceId}`, {
+      const response = await fetch(`${API_URL}/api/grievances/${grievanceId}`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify(body),
@@ -162,7 +162,7 @@ export const apiService = {
       console.log(`📡 Sending upvote request to: ${API_URL}/grievances/${grievanceId}/upvote`);
       console.log(`📋 Request headers:`, headers);
       
-      const response = await fetch(`${API_URL}/grievances/${grievanceId}/upvote`, {
+      const response = await fetch(`${API_URL}/api/grievances/${grievanceId}/upvote`, {
         method: "POST",
         headers: headers,
       });
@@ -188,7 +188,7 @@ export const apiService = {
   getGrievanceById: async (complaintId) => {
     try {
       // Public endpoint - no authentication needed
-      const response = await fetch(`${API_URL}/grievances/id/${complaintId}`, {
+      const response = await fetch(`${API_URL}/api/grievances/id/${complaintId}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json"
@@ -221,7 +221,7 @@ export const apiService = {
   // Admin Dashboard Stats
   getAdminDashboardStats: async () => {
     try {
-      const response = await fetch(`${API_URL}/grievances/admin/stats`, {
+      const response = await fetch(`${API_URL}/api/grievances/admin/stats`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -237,7 +237,7 @@ export const apiService = {
   // Admin User Management
   getAllUsers: async (role = null) => {
     try {
-      const url = role ? `${API_URL}/admin/users?role=${role}` : `${API_URL}/admin/users`;
+      const url = role ? `${API_URL}/api/admin/users?role=${role}` : `${API_URL}/api/admin/users`;
       const response = await fetch(url, {
         method: "GET",
         headers: getAuthHeaders(),
@@ -253,7 +253,7 @@ export const apiService = {
 
   assignUserRole: async (userId, role, ward = null) => {
     try {
-      const response = await fetch(`${API_URL}/admin/users/${userId}/assign-role`, {
+      const response = await fetch(`${API_URL}/api/admin/users/${userId}/assign-role`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify({ role, ward }),
@@ -269,7 +269,7 @@ export const apiService = {
 
   toggleUserStatus: async (userId) => {
     try {
-      const response = await fetch(`${API_URL}/admin/users/toggle-status/${userId}`, {
+      const response = await fetch(`${API_URL}/api/admin/users/toggle-status/${userId}`, {
         method: "PATCH",
         headers: getAuthHeaders(),
       });
@@ -286,7 +286,7 @@ export const apiService = {
   getPublicComplaints: async (params = {}) => {
     try {
       const queryString = new URLSearchParams(params).toString();
-      const url = queryString ? `${API_URL}/grievances/public?${queryString}` : `${API_URL}/grievances/public`;
+      const url = queryString ? `${API_URL}/api/grievances/public?${queryString}` : `${API_URL}/api/grievances/public`;
       const response = await fetch(url, {
         method: "GET",
         headers: getAuthHeaders(),
@@ -303,7 +303,7 @@ export const apiService = {
   // Feedback
   submitFeedback: async (feedbackData) => {
     try {
-      const response = await fetch(`${API_URL}/feedback`, {
+      const response = await fetch(`${API_URL}/api/feedback`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify(feedbackData),
@@ -319,7 +319,7 @@ export const apiService = {
 
   getAllFeedback: async () => {
     try {
-      const response = await fetch(`${API_URL}/feedback/all`, {
+      const response = await fetch(`${API_URL}/api/feedback/all`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -334,7 +334,7 @@ export const apiService = {
 
   getComplaintFeedback: async (complaintId) => {
     try {
-      const response = await fetch(`${API_URL}/feedback/${complaintId}`, {
+      const response = await fetch(`${API_URL}/api/feedback/${complaintId}`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -353,7 +353,7 @@ export const apiService = {
 
   checkPendingFeedback: async () => {
     try {
-      const response = await fetch(`${API_URL}/feedback/pending`, {
+      const response = await fetch(`${API_URL}/api/feedback/pending`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -368,7 +368,7 @@ export const apiService = {
 
   skipFeedback: async (complaintId) => {
     try {
-      const response = await fetch(`${API_URL}/feedback/skip`, {
+      const response = await fetch(`${API_URL}/api/feedback/skip`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({ complaintId }),
@@ -385,7 +385,7 @@ export const apiService = {
   // Ward Admin Management
   createWardAdminInvitation: async (invitationData) => {
     try {
-      const response = await fetch(`${API_URL}/ward-admin/invite`, {
+      const response = await fetch(`${API_URL}/api/ward-admin/invite`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify(invitationData),
@@ -401,7 +401,7 @@ export const apiService = {
 
   getPendingInvitations: async () => {
     try {
-      const response = await fetch(`${API_URL}/ward-admin/invitations`, {
+      const response = await fetch(`${API_URL}/api/ward-admin/invitations`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -416,7 +416,7 @@ export const apiService = {
 
   resendWardAdminInvitation: async (invitationId) => {
     try {
-      const response = await fetch(`${API_URL}/ward-admin/invitations/${invitationId}/resend`, {
+      const response = await fetch(`${API_URL}/api/ward-admin/invitations/${invitationId}/resend`, {
         method: "POST",
         headers: getAuthHeaders(),
       });
@@ -431,7 +431,7 @@ export const apiService = {
 
   getWardComplaints: async () => {
     try {
-      const response = await fetch(`${API_URL}/ward-admin/complaints`, {
+      const response = await fetch(`${API_URL}/api/ward-admin/complaints`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -463,7 +463,7 @@ export const apiService = {
   // Advanced Analytics
   getGrievanceTrends: async (range = "monthly", startDate = null, endDate = null) => {
     try {
-      let url = `${API_URL}/analytics/trends?range=${range}`;
+      let url = `${API_URL}/api/analytics/trends?range=${range}`;
       if (startDate) url += `&startDate=${startDate}`;
       if (endDate) url += `&endDate=${endDate}`;
       
@@ -481,7 +481,7 @@ export const apiService = {
 
   getWardPerformance: async () => {
     try {
-      const response = await fetch(`${API_URL}/analytics/ward-performance`, {
+      const response = await fetch(`${API_URL}/api/analytics/ward-performance`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -495,7 +495,7 @@ export const apiService = {
 
   getResolutionTimeAnalytics: async () => {
     try {
-      const response = await fetch(`${API_URL}/analytics/resolution-time`, {
+      const response = await fetch(`${API_URL}/api/analytics/resolution-time`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -509,7 +509,7 @@ export const apiService = {
 
   getCategoryCorrelation: async () => {
     try {
-      const response = await fetch(`${API_URL}/analytics/category-correlation`, {
+      const response = await fetch(`${API_URL}/api/analytics/category-correlation`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -524,7 +524,7 @@ export const apiService = {
   // Enhanced Analytics for Reports
   getEnhancedAnalytics: async (timeframe = "1y") => {
     try {
-      const response = await fetch(`${API_URL}/analytics/enhanced?timeframe=${timeframe}`, {
+      const response = await fetch(`${API_URL}/api/analytics/enhanced?timeframe=${timeframe}`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -540,7 +540,7 @@ export const apiService = {
   // Contact/Support Messages
   submitContactMessage: async (messageData) => {
     try {
-      const response = await fetch(`${API_URL}/contact`, {
+      const response = await fetch(`${API_URL}/api/contact`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -559,7 +559,7 @@ export const apiService = {
   getContactMessages: async (params = {}) => {
     try {
       const queryString = new URLSearchParams(params).toString();
-      const url = queryString ? `${API_URL}/contact?${queryString}` : `${API_URL}/contact`;
+      const url = queryString ? `${API_URL}/api/contact?${queryString}` : `${API_URL}/api/contact`;
       const response = await fetch(url, {
         method: "GET",
         headers: getAuthHeaders(),
@@ -575,7 +575,7 @@ export const apiService = {
 
   getWardAdminsForAssignment: async () => {
     try {
-      const response = await fetch(`${API_URL}/contact/ward-admins`, {
+      const response = await fetch(`${API_URL}/api/contact/ward-admins`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
@@ -590,7 +590,7 @@ export const apiService = {
 
   assignContactMessage: async (ticketId, wardAdminId) => {
     try {
-      const response = await fetch(`${API_URL}/contact/${ticketId}/assign`, {
+      const response = await fetch(`${API_URL}/api/contact/${ticketId}/assign`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify({ wardAdminId }),
@@ -606,7 +606,7 @@ export const apiService = {
 
   updateContactMessageStatus: async (ticketId, status) => {
     try {
-      const response = await fetch(`${API_URL}/contact/ward-admin/${ticketId}/status`, {
+      const response = await fetch(`${API_URL}/api/contact/ward-admin/${ticketId}/status`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify({ status }),
@@ -624,8 +624,8 @@ export const apiService = {
     try {
       const queryString = new URLSearchParams(params).toString();
       const url = queryString
-        ? `${API_URL}/contact/ward-admin/messages?${queryString}`
-        : `${API_URL}/contact/ward-admin/messages`;
+        ? `${API_URL}/api/contact/ward-admin/messages?${queryString}`
+        : `${API_URL}/api/contact/ward-admin/messages`;
       const response = await fetch(url, {
         method: "GET",
         headers: getAuthHeaders(),

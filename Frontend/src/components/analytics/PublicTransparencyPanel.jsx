@@ -25,11 +25,12 @@ const PublicTransparencyPanel = () => {
       const token = localStorage.getItem("authToken");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
       const [publicRes, wardRes, officerRes, resolutionRes] = await Promise.all([
-        fetch("http://localhost:3000/api/transparency/public", { headers }),
-        fetch("http://localhost:3000/api/transparency/ward-performance", { headers }),
-        fetch("http://localhost:3000/api/transparency/officer-performance", { headers }),
-        fetch("http://localhost:3000/api/transparency/resolution-time", { headers })
+        fetch(`${BACKEND_URL}/api/transparency/public`, { headers }),
+        fetch(`${BACKEND_URL}/api/transparency/ward-performance`, { headers }),
+        fetch(`${BACKEND_URL}/api/transparency/officer-performance`, { headers }),
+        fetch(`${BACKEND_URL}/api/transparency/resolution-time`, { headers })
       ]);
 
       const [publicJson, wardJson, officerJson, resolutionJson] = await Promise.all([

@@ -17,7 +17,8 @@ const PatternInsights = () => {
     const fetchPatterns = async () => {
       try {
         const token = localStorage.getItem("authToken");
-        const response = await fetch("http://localhost:3000/api/analytics-advanced/patterns", {
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+        const response = await fetch(`${BACKEND_URL}/api/analytics-advanced/patterns`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         

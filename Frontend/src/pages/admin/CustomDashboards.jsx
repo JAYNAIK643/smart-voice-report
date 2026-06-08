@@ -22,7 +22,8 @@ const CustomDashboards = () => {
 
   const fetchDashboards = async () => {
     try {
-      const response = await fetch("http://localhost:3000/api/advanced-analytics/dashboards", {
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+      const response = await fetch(`${BACKEND_URL}/api/advanced-analytics/dashboards`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -62,7 +63,7 @@ const CustomDashboards = () => {
     if (!confirm("Are you sure you want to delete this dashboard?")) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/api/advanced-analytics/dashboards/${dashboardId}`, {
+      const response = await fetch(`${BACKEND_URL}/api/advanced-analytics/dashboards/${dashboardId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -89,8 +90,8 @@ const CustomDashboards = () => {
   const handleSave = async (dashboardData) => {
     try {
       const url = selectedDashboard
-        ? `http://localhost:3000/api/advanced-analytics/dashboards/${selectedDashboard._id}`
-        : "http://localhost:3000/api/advanced-analytics/dashboards";
+        ? `${BACKEND_URL}/api/advanced-analytics/dashboards/${selectedDashboard._id}`
+        : `${BACKEND_URL}/api/advanced-analytics/dashboards`;
       const method = selectedDashboard ? "PUT" : "POST";
 
       const response = await fetch(url, {

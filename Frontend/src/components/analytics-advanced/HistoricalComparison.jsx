@@ -21,7 +21,7 @@ const HistoricalComparison = () => {
       setLoading(true);
       try {
         const token = localStorage.getItem("authToken");
-        const response = await fetch(`http://localhost:3000/api/analytics-advanced/comparison?months=${months}`, {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/analytics-advanced/comparison?months=${months}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         

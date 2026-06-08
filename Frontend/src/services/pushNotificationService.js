@@ -191,7 +191,7 @@ export const savePushSubscription = async (subscription) => {
 
   try {
     const token = localStorage.getItem('authToken');
-    const response = await fetch('http://localhost:3000/api/notifications/push/subscribe', {
+    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/notifications/push/subscribe`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

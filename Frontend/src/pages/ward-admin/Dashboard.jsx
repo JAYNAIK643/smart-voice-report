@@ -120,7 +120,7 @@ const WardAdminDashboard = () => {
     setIsRefreshing(true);
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch("http://localhost:3000/api/ward-admin/complaints", {
+      const response = await fetch(`${API_URL}/ward-admin/complaints`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
       const data = await response.json();

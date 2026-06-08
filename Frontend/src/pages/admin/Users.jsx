@@ -33,7 +33,7 @@ const Users = () => {
       // Backend now returns only SUPER_ADMIN and WARD_ADMIN users
       const response = isAdmin 
         ? await apiService.getAllUsers(filterRole === "all" ? null : filterRole)
-        : await fetch("http://localhost:3000/api/users/admin/all", {
+        : await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/users/admin/all`, {
             headers: {
               "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
               "Content-Type": "application/json"

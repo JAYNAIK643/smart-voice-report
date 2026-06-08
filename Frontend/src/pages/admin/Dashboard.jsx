@@ -50,7 +50,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const API_BASE = "http://localhost:3000/api";
+        const API_BASE = (import.meta.env.VITE_BACKEND_URL || "http://localhost:3000") + "/api";
         const token = localStorage.getItem("authToken");
         const headers = { 
           "Content-Type": "application/json",
@@ -153,7 +153,7 @@ const Dashboard = () => {
     setIsRefreshing(true);
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch("http://localhost:3000/api/grievances/admin/stats", {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/grievances/admin/stats`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
       const data = await response.json();

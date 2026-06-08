@@ -84,7 +84,8 @@ const SentimentAnalytics = () => {
       }
       
       // Fetch stats
-      const statsRes = await fetch(`http://localhost:3000/api/sentiment/statistics`, {
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+      const statsRes = await fetch(`${BACKEND_URL}/api/sentiment/statistics`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       console.log('Stats status:', statsRes.status);
@@ -92,7 +93,7 @@ const SentimentAnalytics = () => {
       console.log('Stats data:', statsData);
       
       // Fetch trends  
-      const trendsRes = await fetch(`http://localhost:3000/api/sentiment/trends?days=30&interval=day`, {
+      const trendsRes = await fetch(`${BACKEND_URL}/api/sentiment/trends?days=30&interval=day`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       console.log('Trends status:', trendsRes.status);

@@ -27,13 +27,16 @@ const TwoFactorSetup = ({ onSetupComplete, setupToken }) => {
 
   // Use setupToken if provided (for mandatory setup during login), otherwise use stored token (for settings page)
   const token = setupToken || localStorage.getItem("authToken");
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
   // Step 1: Initialize 2FA Setup
   const handleInitializeSetup = async () => {
     console.log("🔐 [TwoFactorSetup] Initializing 2FA setup...");
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:3000/api/auth/2fa/setup", {
+      const tokenPreview = token ? `${token.substring(0,10)}...` : null;
+      console.log("🔐 [TwoFactorSetup] Using token:", { tokenPreview });
+      const response = await fetch(`${backendUrl}/api/auth/2fa/setup`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -89,7 +92,7 @@ const TwoFactorSetup = ({ onSetupComplete, setupToken }) => {
 
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:3000/api/auth/2fa/verify-setup", {
+      const response = await fetch(`${backendUrl}/api/auth/2fa/verify-setup`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

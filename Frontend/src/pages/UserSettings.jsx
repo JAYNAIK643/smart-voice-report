@@ -25,12 +25,15 @@ import BadgesSection from "@/components/BadgesSection";
 import { apiService } from "@/services/apiService";
 import VoiceResponse from "@/components/voice/VoiceResponse";
 import TwoFactorSetup from "@/components/security/TwoFactorSetup";
+import EmailOTPSetup from "@/components/security/EmailOTPSetup";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const UserSettings = () => {
   const { preferences, updatePreference } = useNotifications();
   const { permission, requestPermission, isSupported } = usePushNotifications();
   const { earnedBadges, availableBadges } = useBadges();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAuthenticated } = useAuth();
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
   const { complaints } = useComplaints();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("profile");
@@ -46,12 +49,26 @@ const UserSettings = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [show2FASetup, setShow2FASetup] = useState(false);
   const [twoFactorStatus, setTwoFactorStatus] = useState(null);
+  // selectedMethod: null => show method selection; 'totp' or 'email' => show respective setup component
+  const [selectedMethod, setSelectedMethod] = useState(null);
+  // Which option is selected in the method chooser (defaults to Email/Gmail OTP - recommended)
+  const [methodChoice, setMethodChoice] = useState("email");
+  // Authenticator app option is disabled by default; user may enable it in chooser
+  const [allowTotp, setAllowTotp] = useState(false);
 
   useEffect(() => {
     document.title = "Settings | SmartCity";
+
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      console.log("🔐 UserSettings - no auth token found, redirecting to /auth");
+      navigate("/auth", { replace: true });
+      return;
+    }
+
     fetchUserData();
     fetch2FAStatus();
-  }, []);
+  }, [isAuthenticated, navigate]);
 
   // Auto-refresh user stats when complaints change
   useEffect(() => {
@@ -110,7 +127,7 @@ const UserSettings = () => {
         return;
       }
 
-      const response = await fetch("http://localhost:3000/api/auth/2fa/status", {
+      const response = await fetch(`${backendUrl}/api/auth/2fa/status`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -908,7 +925,7 @@ const UserSettings = () => {
 
                                     try {
                                       const authToken = localStorage.getItem("authToken");
-                                      const response = await fetch("http://localhost:3000/api/auth/2fa/disable", {
+                                      const response = await fetch(`${backendUrl}/api/auth/2fa/disable`, {
                                         method: "POST",
                                         headers: {
                                           "Content-Type": "application/json",
@@ -943,7 +960,7 @@ const UserSettings = () => {
 
                                     try {
                                       const authToken = localStorage.getItem("authToken");
-                                      const response = await fetch("http://localhost:3000/api/auth/2fa/regenerate-backup-codes", {
+                                      const response = await fetch(`${backendUrl}/api/auth/2fa/regenerate-backup-codes`, {
                                         method: "POST",
                                         headers: {
                                           "Content-Type": "application/json",
@@ -979,7 +996,7 @@ const UserSettings = () => {
                                   </p>
                                 </div>
                                 <Button 
-                                  onClick={() => setShow2FASetup(true)}
+                                  onClick={() => { setShow2FASetup(true); setSelectedMethod(null); setMethodChoice('email'); setAllowTotp(false); }}
                                   size="lg"
                                   className="bg-blue-600 hover:bg-blue-700 text-white"
                                 >
@@ -999,20 +1016,143 @@ const UserSettings = () => {
                               className="bg-card border border-border rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
                             >
                               <div className="p-6">
-                                <TwoFactorSetup 
-                                  onSetupComplete={() => {
-                                    setShow2FASetup(false);
-                                    fetch2FAStatus();
-                                    toast.success("2FA enabled successfully! Save your backup codes.");
-                                  }}
-                                />
-                                <Button 
-                                  variant="outline" 
-                                  className="w-full mt-4"
-                                  onClick={() => setShow2FASetup(false)}
-                                >
-                                  Cancel
-                                </Button>
+                                {/* Method Selection or Setup Component */}
+                                {selectedMethod === null ? (
+                                  <div className="space-y-4">
+                                    <div>
+                                      <h3 className="font-semibold text-lg">Choose 2FA Method</h3>
+                                      <p className="text-sm text-muted-foreground">Select how you want to secure your account</p>
+                                    </div>
+                                    
+                                    <div className="space-y-3">
+                                      {/* TOTP Option (disabled by default) */}
+                                      <motion.label 
+                                        whileHover={{ scale: 1.02 }}
+                                        onClick={() => { if (allowTotp) setMethodChoice('totp'); }}
+                                        className={`flex items-start gap-4 p-4 rounded-lg border cursor-pointer transition-all ${
+                                          methodChoice === "totp" 
+                                            ? "border-blue-500 bg-blue-500/10" 
+                                            : "border-border hover:border-border/80"
+                                        } ${!allowTotp ? 'opacity-60 pointer-events-auto' : ''}`}
+                                      >
+                                        <RadioGroupItem 
+                                          value="totp"
+                                          id="method-totp"
+                                          checked={methodChoice === "totp"}
+                                          onClick={() => { if (allowTotp) setMethodChoice('totp'); }}
+                                        />
+                                        <div className="flex-1">
+                                          <p className="font-medium">Authenticator App</p>
+                                          <p className="text-sm text-muted-foreground">Use Google Authenticator, Authy, or similar apps</p>
+                                          <p className="text-xs text-muted-foreground mt-2">Optional — disabled by default</p>
+                                          {!allowTotp && (
+                                            <div className="mt-2">
+                                              <button
+                                                className="text-xs text-blue-600"
+                                                onClick={(e) => { e.stopPropagation(); setAllowTotp(true); setMethodChoice('totp'); }}
+                                              >Enable Authenticator App</button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </motion.label>
+
+                                      {/* Email OTP Option (default & recommended) */}
+                                      <motion.label 
+                                        whileHover={{ scale: 1.02 }}
+                                        onClick={() => setMethodChoice('email')}
+                                        className={`flex items-start gap-4 p-4 rounded-lg border cursor-pointer transition-all ${
+                                          methodChoice === "email" 
+                                            ? "border-blue-500 bg-blue-500/10"  
+                                            : "border-border hover:border-border/80"
+                                        }`}
+                                      >
+                                        <RadioGroupItem 
+                                          value="email"
+                                          id="method-email"
+                                          checked={methodChoice === "email"}
+                                          onClick={() => setMethodChoice('email')}
+                                        />
+                                        <div className="flex-1">
+                                          <p className="font-medium">Gmail OTP आधारित 2FA</p>
+                                          <p className="text-sm text-muted-foreground">Receive 6-digit codes via email</p>
+                                          <div className="mt-2 inline-block text-xs bg-green-100 text-green-800 px-2 py-1 rounded">FREE • Recommended</div>
+                                        </div>
+                                      </motion.label>
+                                    </div>
+                                    <div className="flex gap-2 pt-4">
+                                      <Button 
+                                        variant="outline" 
+                                        className="flex-1"
+                                        onClick={() => {
+                                          setShow2FASetup(false);
+                                          setSelectedMethod(null);
+                                          setMethodChoice('email');
+                                          setAllowTotp(false);
+                                        }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button 
+                                        className="flex-1"
+                                        disabled={methodChoice === null || (methodChoice === 'totp' && !allowTotp)}
+                                        onClick={() => {
+                                          // Open the chosen method's setup
+                                          setSelectedMethod(methodChoice);
+                                        }}
+                                      >
+                                        Continue
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : selectedMethod === "totp" ? (
+                                  <>
+                                    <TwoFactorSetup 
+                                      onSetupComplete={() => {
+                                        setShow2FASetup(false);
+                                        setSelectedMethod(null);
+                                        setMethodChoice('email');
+                                        setAllowTotp(false);
+                                        fetch2FAStatus();
+                                        toast.success("2FA enabled successfully! Save your backup codes.");
+                                      }}
+                                    />
+                                    <Button 
+                                      variant="outline" 
+                                      className="w-full mt-4"
+                                      onClick={() => {
+                                        setSelectedMethod(null);
+                                        setMethodChoice('email');
+                                        setAllowTotp(false);
+                                      }}
+                                    >
+                                      Back to Method Selection
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <EmailOTPSetup 
+                                      onSetupComplete={() => {
+                                        setShow2FASetup(false);
+                                        setSelectedMethod(null);
+                                        setMethodChoice('email');
+                                        setAllowTotp(false);
+                                        fetch2FAStatus();
+                                        toast.success("Email 2FA enabled successfully!");
+                                      }}
+                                    />
+                                    <Button 
+                                      variant="outline" 
+                                      className="w-full mt-4"
+                                      onClick={() => {
+                                        setSelectedMethod(null);
+                                        setMethodChoice('email');
+                                        setAllowTotp(false);
+                                      }}
+                                    >
+                                      Back to Method Selection
+                                    </Button>
+                                  </>
+                                )}
                               </div>
                             </motion.div>
                           </div>

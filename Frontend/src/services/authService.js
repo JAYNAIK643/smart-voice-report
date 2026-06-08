@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_BACKEND_URL + "/api/auth";
+const API_URL = (import.meta.env.VITE_BACKEND_URL || "http://localhost:3000") + "/api/auth";
 
 export const authService = {
   signup: async (name, email, password, role = "user") => {
@@ -55,7 +55,19 @@ export const authService = {
         throw new Error(data.message || "Login failed");
       }
 
-      // Check if 2FA is required
+      // Check if Email OTP is required (auto-sent)
+      if (data.requires2FA && data.method === "email") {
+        return { 
+          success: true, 
+          requires2FA: true,
+          method: "email",
+          setupToken: data.data?.setupToken,
+          userId: data.data?.userId,
+          email: data.data?.email 
+        };
+      }
+
+      // Check if 2FA is required (method selection needed)
       if (data.requiresTwoFactor) {
         return { 
           success: true, 
@@ -63,7 +75,8 @@ export const authService = {
           needs2FASetup: data.needs2FASetup || false,
           setupToken: data.data?.setupToken,
           userId: data.data?.userId,
-          email: data.data?.email 
+          email: data.data?.email,
+          availableMethods: data.data?.availableMethods
         };
       }
 

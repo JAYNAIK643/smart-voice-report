@@ -184,7 +184,7 @@ export const syncOfflineComplaints = async () => {
 
     for (const item of queue) {
       try {
-        const response = await fetch('http://localhost:3000/api/grievances', {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/grievances`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

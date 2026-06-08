@@ -84,7 +84,18 @@ export const AuthProvider = ({ children }) => { //Jo bhi component inside hoga �
         return { error: { message: result.error } };
       }
 
-      // Check if 2FA is required
+      // Check if Email OTP (special case returned by authService)
+      if (result.requires2FA && result.method === "email") {
+        return {
+          requires2FA: true,
+          method: "email",
+          setupToken: result.setupToken,
+          userId: result.userId,
+          email: result.email,
+        };
+      }
+
+      // Check if general 2FA is required (method selection needed)
       if (result.requiresTwoFactor) {
         console.log('🔐 AuthContext - 2FA required');
         return { 
@@ -94,6 +105,24 @@ export const AuthProvider = ({ children }) => { //Jo bhi component inside hoga �
           userId: result.userId,
           email: result.email 
         };
+      }
+
+      // Ensure token and user are persisted (defensive)
+      try {
+        if (result.data?.token) {
+          localStorage.setItem("authToken", result.data.token);
+          localStorage.setItem("user", JSON.stringify(result.data.user));
+          console.log("🔐 AuthContext - Stored auth token and user (login)", {
+            tokenPreview: `${result.data.token.substring(0,10)}...`,
+            userId: result.data.user?.id || result.data.user?._id,
+            email: result.data.user?.email,
+          });
+        } else {
+          const existing = authService.getToken();
+          console.log("🔐 AuthContext - No new token in response, existing token:", existing ? `${existing.substring(0,10)}...` : null);
+        }
+      } catch (err) {
+        console.error("🔐 AuthContext - Error storing token/user:", err);
       }
 
       console.log('✅ AuthContext - Setting user:', result.data.user);

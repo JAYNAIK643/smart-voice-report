@@ -91,7 +91,7 @@ const Admin = () => {
       try {
         const token = localStorage.getItem("authToken");
         const headers = { Authorization: `Bearer ${token}` };
-        const API_BASE = "http://localhost:3000/api";
+        const API_BASE = (import.meta.env.VITE_BACKEND_URL || "http://localhost:3000") + "/api";
   
         // Stats
         const statsRes = await fetch(`${API_BASE}/grievances/admin/stats`, { headers });

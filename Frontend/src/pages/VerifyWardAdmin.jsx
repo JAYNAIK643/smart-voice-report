@@ -33,7 +33,8 @@ const VerifyWardAdmin = () => {
 
   const verifyToken = async () => {
     try {
-      const response = await fetch(`http://localhost:3000/api/ward-admin/verify/${token}`, {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+      const response = await fetch(`${backendUrl}/api/ward-admin/verify/${token}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json"
@@ -96,7 +97,7 @@ const VerifyWardAdmin = () => {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("http://localhost:3000/api/ward-admin/verify-and-signup", {
+      const response = await fetch(`${backendUrl}/api/ward-admin/verify-and-signup`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

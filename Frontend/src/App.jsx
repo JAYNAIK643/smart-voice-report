@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useEffect } from "react";
+
+
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
@@ -53,6 +55,7 @@ import FeedbackPrompt from "@/components/FeedbackPrompt";
 import OfflineIndicator from "@/components/mobile/OfflineIndicator";
 import PWAInstallPrompt from "@/components/mobile/PWAInstallPrompt";
 import BottomNav from "@/components/mobile/BottomNav";
+import VerifyEmailOTP from "./pages/VerifyEmailOTP";
 
 const queryClient = new QueryClient();
 
@@ -118,6 +121,7 @@ const App = () => {
                   />
                   <Route path="/services" element={<Services />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/verify-email-otp" element={<VerifyEmailOTP />} />
                   <Route path="/admin-login" element={<AdminLogin />} />
                   <Route path="/ward-admin-login" element={<WardAdminLogin />} />
                   <Route path="/verify-ward-admin/:token" element={<VerifyWardAdmin />} />

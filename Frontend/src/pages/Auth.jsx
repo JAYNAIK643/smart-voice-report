@@ -11,6 +11,7 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { z } from "zod";
 import TwoFactorVerify from "@/components/security/TwoFactorVerify";
 import TwoFactorSetup from "@/components/security/TwoFactorSetup";
+import EmailOTPVerify from "@/components/security/EmailOTPVerify";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -27,6 +28,7 @@ const Auth = () => {
   const [requires2FA, setRequires2FA] = useState(false);
   const [twoFactorData, setTwoFactorData] = useState(null);
   const [needs2FASetup, setNeeds2FASetup] = useState(false);
+  const [selectedTwoFAMethod, setSelectedTwoFAMethod] = useState(null); // "totp" or "email"
 
   const { signIn, signUp, isAuthenticated, isAdmin, isWardAdmin, loading, updateUserFromStorage } = useAuth();
   const { toast } = useToast();
@@ -38,6 +40,8 @@ const Auth = () => {
   const from = useMemo(() => {
     return location.state?.from?.pathname || "/";
   }, [location.state?.from?.pathname]);
+
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
   useEffect(() => {
     console.log('🔍 Auth state check:', { isAuthenticated, isAdmin, isWardAdmin, loading, from });
@@ -63,6 +67,34 @@ const Auth = () => {
       console.log('❌ User not authenticated, staying on auth page');
     }
   }, [isAuthenticated, isAdmin, isWardAdmin, loading, navigate, from]);
+
+  // Helper: If user selects Email method during multi-method flows, call resend-login to send OTP
+  const handleSelectEmailMethod = async (userId) => {
+    try {
+      const resp = await fetch(`${backendUrl}/api/auth/2fa/email-otp/resend-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await resp.json();
+      if (data.success && data.data?.setupToken) {
+        localStorage.setItem("tempAuthToken", data.data.setupToken);
+        localStorage.setItem("userId", userId);
+        setSelectedTwoFAMethod("email");
+        navigate("/verify-email-otp");
+      } else if (data.success) {
+        // No token but OTP resent; fallback to navigation
+        localStorage.setItem("userId", userId);
+        setSelectedTwoFAMethod("email");
+        navigate("/verify-email-otp");
+      } else {
+        toast({ title: "Failed to send OTP", description: data.message || "Could not send code", variant: "destructive" });
+      }
+    } catch (err) {
+      console.error("Error sending OTP:", err);
+      toast({ title: "Network Error", description: "Failed to contact server", variant: "destructive" });
+    }
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -102,6 +134,14 @@ const Auth = () => {
       if (isLogin) {
         const result = await signIn(email, password, "user");
         
+        // Check if Email OTP is required for login
+        if (result.requires2FA && result.method === "email") {
+          localStorage.setItem("tempAuthToken", result.setupToken || "");
+          localStorage.setItem("userId", result.userId || "");
+          navigate("/verify-email-otp");
+          return;
+        }
+        
         // Check if 2FA is required
         if (result.requiresTwoFactor) {
           setRequires2FA(true);
@@ -114,12 +154,14 @@ const Auth = () => {
           setIsSubmitting(false);
           return;
         }
+
+        
         
         if (result.error) {
           let message = result.error.message || "An error occurred during sign in";
           
           if (message.includes("Network error") || message.includes("Failed to fetch")) {
-            message = "Cannot connect to server. Please make sure the backend is running on http://localhost:3000";
+            message = "Cannot connect to server. Please check your internet connection or try again later.";
           } else if (message.includes("admin")) {
             message = "Please use admin login for admin accounts";
           }
@@ -157,7 +199,7 @@ const Auth = () => {
           let message = error.message || "An error occurred during sign up";
           
           if (message.includes("Network error") || message.includes("Failed to fetch")) {
-            message = "Cannot connect to server. Please make sure the backend is running on http://localhost:3000";
+            message = "Cannot connect to server. Please check your internet connection or try again later.";
           } else if (message.includes("already registered")) {
             message = "This email is already registered. Please sign in instead.";
           }
@@ -233,6 +275,7 @@ const Auth = () => {
     setRequires2FA(false);
     setNeeds2FASetup(false);
     setTwoFactorData(null);
+    setSelectedTwoFAMethod(null);
   };
   
   const handle2FASetupComplete = async () => {
@@ -283,6 +326,83 @@ const Auth = () => {
 
   // Show 2FA verification if required
   if (requires2FA && twoFactorData) {
+    // Show method selection if multiple methods are available and no method selected yet
+    if (!selectedTwoFAMethod && twoFactorData.availableMethods?.length > 1) {
+      return (
+        <div className="min-h-screen flex items-center justify-center px-4 py-20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-md"
+          >
+            <div className="bg-card border border-border rounded-2xl shadow-card p-8">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold">Choose Verification Method</h2>
+                <p className="text-muted-foreground mt-2">
+                  How would you like to verify your identity?
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {twoFactorData.availableMethods.includes("totp") && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setSelectedTwoFAMethod("totp")}
+                    className="w-full p-4 rounded-lg border border-border hover:border-primary/50 bg-muted/30 hover:bg-muted/50 transition-all text-left"
+                  >
+                    <p className="font-medium">Authenticator App</p>
+                    <p className="text-sm text-muted-foreground">Use your authenticator app</p>
+                  </motion.button>
+                )}
+
+                {twoFactorData.availableMethods.includes("email") && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleSelectEmailMethod(twoFactorData.userId)}
+                    className="w-full p-4 rounded-lg border border-border hover:border-primary/50 bg-muted/30 hover:bg-muted/50 transition-all text-left"
+                  >
+                    <p className="font-medium">Email OTP</p>
+                    <p className="text-sm text-muted-foreground">Receive code via email</p>
+                  </motion.button>
+                )}
+              </div>
+
+              <button
+                onClick={handle2FABack}
+                className="w-full mt-6 text-sm text-muted-foreground hover:text-foreground"
+              >
+                ← Back to login
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      );
+    }
+
+    // Show Email OTP verification
+    if (selectedTwoFAMethod === "email") {
+      return (
+        <div className="min-h-screen flex items-center justify-center px-4 py-20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-md"
+          >
+            <EmailOTPVerify
+              setupToken={twoFactorData.setupToken}
+              onSuccess={handle2FAVerified}
+              onBack={() => {
+                setSelectedTwoFAMethod(null);
+              }}
+            />
+          </motion.div>
+        </div>
+      );
+    }
+
+    // Show TOTP verification (default)
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-20">
         <motion.div

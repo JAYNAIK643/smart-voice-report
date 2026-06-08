@@ -44,9 +44,10 @@ const KPITracker = () => {
         compareWithPrevious: compareEnabled.toString(),
       });
 
-      console.log('Fetching KPIs from:', `http://localhost:3000/api/advanced-analytics/kpis?${params}`);
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+      console.log('Fetching KPIs from:', `${BACKEND_URL}/api/advanced-analytics/kpis?${params}`);
 
-      const response = await fetch(`http://localhost:3000/api/advanced-analytics/kpis?${params}`, {
+      const response = await fetch(`${BACKEND_URL}/api/advanced-analytics/kpis?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

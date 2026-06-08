@@ -17,6 +17,7 @@ const TwoFactorVerify = ({ userId, email, onVerified, onBack }) => {
   const [verificationCode, setVerificationCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [useBackupCode, setUseBackupCode] = useState(false);
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
   const handleVerify = async (e) => {
     e.preventDefault();
@@ -32,13 +33,15 @@ const TwoFactorVerify = ({ userId, email, onVerified, onBack }) => {
     }
 
     setLoading(true);
-    console.log("🔐 Verifying 2FA code...", { userId, codeLength, useBackupCode });
+    const token = localStorage.getItem("authToken") || localStorage.getItem("tempAuthToken");
+    console.log("🔐 Verifying 2FA code...", { userId, codeLength, useBackupCode, tokenPreview: token ? `${token.substring(0,10)}...` : null });
     
     try {
-      const response = await fetch("http://localhost:3000/api/auth/2fa/verify", {
+      const response = await fetch(`${backendUrl}/api/auth/2fa/verify`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           userId,

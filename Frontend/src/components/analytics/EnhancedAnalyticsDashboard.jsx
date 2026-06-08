@@ -64,7 +64,7 @@ const EnhancedAnalyticsDashboard = () => {
         category: categoryFilter
       });
       
-      const response = await fetch(`http://localhost:3000/api/analytics/enhanced?${queryParams}`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/analytics/enhanced?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       

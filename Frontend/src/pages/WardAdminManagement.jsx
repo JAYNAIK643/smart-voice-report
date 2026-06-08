@@ -33,7 +33,7 @@ const WardAdminManagement = () => {
       const token = localStorage.getItem("authToken");
       
       // Fetch only ward admin users
-      const response = await fetch(`http://localhost:3000/api/admin/users?role=ward_admin`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/admin/users?role=ward_admin`, {
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"

@@ -65,7 +65,7 @@ const AdminLogin = () => {
         let message = error.message || "An error occurred during admin login";
         
         if (message.includes("Network error") || message.includes("Failed to fetch")) {
-          message = "Cannot connect to server. Please make sure the backend is running on http://localhost:3000";
+          message = "Cannot connect to server. Please check your internet connection or try again later.";
         }
         
         toast({

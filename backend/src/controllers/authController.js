@@ -151,43 +151,74 @@ exports.login = async (req, res, next) => {
       return res.status(403).json({ success: false, message: "Please use admin login portal." });
     }
 
-    // Check if 2FA is required (only for citizens - User collection)
-    if (userRole === "user" && twoFactorAuthService.is2FARequired(user)) {
-      // Check if user has 2FA enabled
-      const has2FAEnabled = twoFactorAuthService.is2FAEnabled(user);
-      
-      if (!has2FAEnabled) {
-        // User needs to set up 2FA - issue a temporary setup token
-        const setupToken = jwt.sign(
-          { id: user._id, email: user.email, role: userRole, setup2FA: true },
-          process.env.JWT_SECRET,
-          { expiresIn: "15m" } // Short expiry for setup token
-        );
-        
+    // 2FA handling for citizen users
+    if (userRole === "user") {
+      const emailOTPService = require("../services/emailOTPService");
+      const hasTOTPEnabled = twoFactorAuthService.is2FAEnabled(user);
+      const hasEmailOTPEnabled = emailOTPService.isEmailOTPEnabled(user);
+
+      // FIRST TIME LOGIN: If no 2FA method exists, auto-enable Email (Gmail) OTP and send code
+      if (!hasTOTPEnabled && !hasEmailOTPEnabled) {
+        try {
+          user.emailOTP = user.emailOTP || {};
+          user.emailOTP.enabled = true; // enable Gmail OTP by default
+          user.emailOTP.enabledAt = new Date();
+          await user.save();
+
+          await emailOTPService.generateAndSendOTP(user);
+
+          const setupToken = jwt.sign(
+            { id: user._id, email: user.email, role: userRole },
+            process.env.JWT_SECRET,
+            { expiresIn: "15m" }
+          );
+
+          return res.status(200).json({
+            success: true,
+            requires2FA: true,
+            method: "email",
+            message: "OTP sent to your email (Gmail OTP enabled by default)",
+            data: { userId: user._id, email: user.email, setupToken },
+          });
+        } catch (err) {
+          console.error("Auto-enable Email OTP error:", err);
+          // Fall through to normal 2FA check below
+        }
+      }
+
+      // Only require 2FA if a method is enabled
+      if (twoFactorAuthService.is2FARequired(user)) {
+        const availableMethods = [];
+        if (hasTOTPEnabled) availableMethods.push("totp");
+        if (hasEmailOTPEnabled) availableMethods.push("email");
+
+        // If only email OTP is enabled, auto-send OTP and return special response
+        if (hasEmailOTPEnabled && !hasTOTPEnabled) {
+          await emailOTPService.generateAndSendOTP(user);
+
+          const setupToken = jwt.sign(
+            { id: user._id, email: user.email, role: userRole },
+            process.env.JWT_SECRET,
+            { expiresIn: "15m" }
+          );
+
+          return res.status(200).json({
+            success: true,
+            requires2FA: true,
+            method: "email",
+            message: "OTP sent to your email",
+            data: { userId: user._id, email: user.email, setupToken },
+          });
+        }
+
         return res.status(200).json({
           success: true,
           requiresTwoFactor: true,
-          needs2FASetup: true,
-          message: "2FA setup required",
-          data: {
-            userId: user._id,
-            email: user.email,
-            setupToken: setupToken // Temporary token for 2FA setup only
-          },
+          needs2FASetup: false,
+          message: "2FA verification required",
+          data: { userId: user._id, email: user.email, availableMethods },
         });
       }
-      
-      // User has 2FA enabled - require verification
-      return res.status(200).json({
-        success: true,
-        requiresTwoFactor: true,
-        needs2FASetup: false,
-        message: "2FA verification required",
-        data: {
-          userId: user._id,
-          email: user.email,
-        },
-      });
     }
 
     // Create JWT token with the determined role

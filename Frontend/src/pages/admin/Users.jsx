@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/auth-context";
 import { apiService } from "@/services/apiService";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, UserPlus, UserMinus, ToggleLeft, ToggleRight, UserCheck, UserX, MapPin, Mail, MoreVertical, Plus } from "lucide-react";
+import { Shield, UserPlus, UserMinus, ToggleLeft, ToggleRight, UserCheck, UserX, MapPin, Mail, MoreVertical, Plus, Copy, Link2, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,8 @@ const Users = () => {
     ward: ""
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [invitationLink, setInvitationLink] = useState(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const navigate = useNavigate();
   const { isAuthenticated, isAdmin } = useAuth();
   const { toast } = useToast();
@@ -111,8 +113,20 @@ const Users = () => {
       const data = await response.json();
       
       if (data.success) {
-        toast({ title: "Success", description: "Ward Admin invitation sent successfully!" });
-        setIsInviteModalOpen(false);
+        if (data.emailSent === false) {
+          // Email failed but invitation created — show link for manual sharing
+          toast({ 
+            title: "Invitation Created", 
+            description: "Email could not be sent automatically. Share the invitation link manually."
+          });
+          setInvitationLink(data.data.invitationLink);
+          setLinkCopied(false);
+        } else {
+          // Email sent successfully
+          toast({ title: "Success", description: "Ward Admin invitation sent successfully via email!" });
+          setIsInviteModalOpen(false);
+          setInvitationLink(null);
+        }
         setInviteForm({ name: "", email: "", ward: "" });
         fetchUsers(); // Refresh the user list
       } else {
@@ -189,7 +203,7 @@ const Users = () => {
               <option value="ward_admin">Ward Admins</option>
               <option value="admin">Super Admins</option>
             </select>
-            <Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
+            <Dialog open={isInviteModalOpen} onOpenChange={(open) => { setIsInviteModalOpen(open); if (!open) { setInvitationLink(null); setLinkCopied(false); } }}>
               <DialogTrigger asChild>
                 <Button className="bg-primary hover:bg-primary/90">
                   <Plus className="w-4 h-4 mr-2" />
@@ -200,69 +214,121 @@ const Users = () => {
                 <DialogHeader>
                   <DialogTitle className="text-xl font-bold">Create Ward Admin</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleInviteSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input
-                      id="name"
-                      value={inviteForm.name}
-                      onChange={(e) => handleFormChange("name", e.target.value)}
-                      placeholder="Enter full name"
-                      required
-                    />
+                
+                {invitationLink ? (
+                  /* Show invitation link when email failed */
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-amber-800">Email could not be sent automatically</p>
+                        <p className="text-sm text-amber-700 mt-1">Share the invitation link below with the invited person. They can use it to create their Ward Admin account.</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Invitation Link</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          readOnly
+                          value={invitationLink}
+                          className="font-mono text-xs bg-muted"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="flex-shrink-0"
+                          onClick={() => {
+                            navigator.clipboard.writeText(invitationLink);
+                            setLinkCopied(true);
+                            setTimeout(() => setLinkCopied(false), 2000);
+                          }}
+                        >
+                          {linkCopied ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                      {linkCopied && <p className="text-xs text-green-600">Link copied to clipboard!</p>}
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setIsInviteModalOpen(false);
+                          setInvitationLink(null);
+                        }}
+                      >
+                        Done
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={inviteForm.email}
-                      onChange={(e) => handleFormChange("email", e.target.value)}
-                      placeholder="Enter email address"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ward">Assigned Ward</Label>
-                    <Select value={inviteForm.ward} onValueChange={(value) => handleFormChange("ward", value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a ward" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Ward 1">Ward 1 (Wagholi)</SelectItem>
-                        <SelectItem value="Ward 2">Ward 2 (Kharadi)</SelectItem>
-                        <SelectItem value="Ward 3">Ward 3 (Hadapsar)</SelectItem>
-                        <SelectItem value="Ward 4">Ward 4 (Baner)</SelectItem>
-                        <SelectItem value="Ward 5">Ward 5 (Hinjewadi)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="pt-4 border-t border-border">
-                    <p className="text-sm text-muted-foreground">
-                      An invitation email will be sent to the provided email address with instructions to create their account.
-                    </p>
-                  </div>
-                  <div className="flex justify-end gap-3 pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsInviteModalOpen(false)}
-                      disabled={isSubmitting}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={isSubmitting}>
-                      {isSubmitting ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                          Sending...
-                        </>
-                      ) : (
-                        "Send Invitation"
-                      )}
-                    </Button>
-                  </div>
-                </form>
+                ) : (
+                  /* Normal invitation form */
+                  <form onSubmit={handleInviteSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Full Name</Label>
+                      <Input
+                        id="name"
+                        value={inviteForm.name}
+                        onChange={(e) => handleFormChange("name", e.target.value)}
+                        placeholder="Enter full name"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email Address</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={inviteForm.email}
+                        onChange={(e) => handleFormChange("email", e.target.value)}
+                        placeholder="Enter email address"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ward">Assigned Ward</Label>
+                      <Select value={inviteForm.ward} onValueChange={(value) => handleFormChange("ward", value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a ward" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Ward 1">Ward 1 (Wagholi)</SelectItem>
+                          <SelectItem value="Ward 2">Ward 2 (Kharadi)</SelectItem>
+                          <SelectItem value="Ward 3">Ward 3 (Hadapsar)</SelectItem>
+                          <SelectItem value="Ward 4">Ward 4 (Baner)</SelectItem>
+                          <SelectItem value="Ward 5">Ward 5 (Hinjewadi)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="pt-4 border-t border-border">
+                      <p className="text-sm text-muted-foreground">
+                        An invitation will be created. If email is configured, it will be sent automatically. Otherwise, you'll receive a link to share manually.
+                      </p>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsInviteModalOpen(false)}
+                        disabled={isSubmitting}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                            Creating...
+                          </>
+                        ) : (
+                          "Create Invitation"
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                )}
               </DialogContent>
             </Dialog>
           </div>

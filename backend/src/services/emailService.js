@@ -202,37 +202,52 @@ console.log("📧 emailService.js loaded");
 
 const nodemailer = require("nodemailer");
 
-const createSendGridTransporter = () => {
-  if (!process.env.SENDGRID_API_KEY) return null;
-  return nodemailer.createTransport({
-    host: "smtp.sendgrid.net",
-    port: 587,
-    secure: false,
-    auth: {
-      user: "apikey",
-      pass: process.env.SENDGRID_API_KEY,
-    },
-  });
-};
+/*
+ * SendGrid transporter intentionally commented out to prefer Gmail SMTP (free)
+ * If SendGrid is required in future, uncomment the block below and set SENDGRID_API_KEY.
+ */
+// const createSendGridTransporter = () => {
+//   if (!process.env.SENDGRID_API_KEY) return null;
+//   return nodemailer.createTransport({
+//     host: "smtp.sendgrid.net",
+//     port: 587,
+//     secure: false,
+//     auth: {
+//       user: "apikey",
+//       pass: process.env.SENDGRID_API_KEY,
+//     },
+//   });
+// };
 
 const createGmailTransporter = () => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null;
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.error("❌ Gmail SMTP not configured: EMAIL_USER or EMAIL_PASS missing from environment variables.");
+    console.error("   EMAIL_USER set:", !!process.env.EMAIL_USER);
+    console.error("   EMAIL_PASS set:", !!process.env.EMAIL_PASS);
+    return null;
+  }
+  console.log("✅ Gmail SMTP credentials found:", process.env.EMAIL_USER);
   return nodemailer.createTransport({
     service: "gmail",
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    // Timeout settings to prevent hanging on slow/failed SMTP connections
+    connectionTimeout: 10000,  // 10 seconds to establish TCP connection
+    greetingTimeout: 10000,    // 10 seconds for SMTP greeting
+    socketTimeout: 15000,      // 15 seconds for any socket operation
   });
 };
 
 const getAvailableProviders = () => {
   const providers = [];
-  if (process.env.SENDGRID_API_KEY) {
-    providers.push({ name: "SendGrid", transporter: createSendGridTransporter() });
-  }
+  // SendGrid usage removed in favor of Gmail SMTP (free).
+  // If you need SendGrid, uncomment the createSendGridTransporter block above and adjust this section.
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     providers.push({ name: "Gmail", transporter: createGmailTransporter() });
+  } else {
+    console.error("❌ No email provider available. Gmail SMTP requires EMAIL_USER and EMAIL_PASS environment variables.");
   }
   return providers.filter((p) => !!p.transporter);
 };
@@ -249,24 +264,42 @@ const sendEmailWithFallback = async (mailOptions) => {
     hasSendGridKey: !!process.env.SENDGRID_API_KEY,
     hasEmailUser: !!process.env.EMAIL_USER,
     hasEmailPass: !!process.env.EMAIL_PASS,
+    emailUser: process.env.EMAIL_USER || "(not set)",
     sender: getSenderAddress(),
     availableProviders: providers.map((p) => p.name),
+    frontendUrl: process.env.FRONTEND_URL || "(not set)",
   });
 
   if (providers.length === 0) {
-    return { success: false, error: "Email service not configured (missing SMTP credentials)" };
+    const errorMsg = "Email service not configured. Set EMAIL_USER and EMAIL_PASS environment variables (Gmail SMTP - free).";
+    console.error("❌", errorMsg);
+    return { success: false, error: errorMsg };
   }
 
   let lastError = null;
   for (const provider of providers) {
     try {
       console.log(`📧 Attempting email send via ${provider.name}`);
+      // Verify SMTP connection before sending
+      if (provider.name === "Gmail") {
+        try {
+          await provider.transporter.verify();
+          console.log("✅ Gmail SMTP connection verified");
+        } catch (verifyErr) {
+          console.error("❌ Gmail SMTP connection failed:", verifyErr.message);
+          throw verifyErr;
+        }
+      }
       await provider.transporter.sendMail(mailOptions);
-      console.log(`✅ Email sent via ${provider.name}`);
+      console.log(`✅ Email sent via ${provider.name} to ${mailOptions.to}`);
       return { success: true, provider: provider.name };
     } catch (err) {
       lastError = err;
       console.error(`EMAIL ERROR (${provider.name}):`, err.message);
+      if (err.code === 'EAUTH') {
+        console.error("   → Authentication failed. Check EMAIL_PASS (must be a Gmail App Password, not your regular password).");
+        console.error("   → Generate App Password: https://myaccount.google.com/apppasswords");
+      }
     }
   }
 
@@ -275,7 +308,7 @@ const sendEmailWithFallback = async (mailOptions) => {
 
 // Email template helper function
 const generateEmailTemplate = (title, content, data) => {
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8082';
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
   const trackUrl = `${frontendUrl}/track`;
   
   // Status badge styling based on status

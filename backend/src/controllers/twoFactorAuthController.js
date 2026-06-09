@@ -1,9 +1,10 @@
 const User = require("../models/User");
 const twoFactorAuthService = require("../services/twoFactorAuthService");
+const emailOTPService = require("../services/emailOTPService");
 
 /**
  * Two-Factor Authentication Controller
- * Handles 2FA setup, verification, and management
+ * Handles 2FA setup, verification, and management (TOTP + Email OTP)
  * Zero-Regression Strategy: New controller, extends authentication system
  */
 
@@ -14,6 +15,9 @@ const twoFactorAuthService = require("../services/twoFactorAuthService");
  */
 exports.setup2FA = async (req, res) => {
   try {
+    console.log("🔐 [setup2FA] incoming request", { authHeader: !!req.headers.authorization });
+    console.log("🔐 [setup2FA] req.user present:", req.user ? { id: req.user._id, email: req.user.email } : null);
+
     const user = await User.findById(req.user._id);
 
     if (!user) {
@@ -151,13 +155,30 @@ exports.verify2FAToken = async (req, res) => {
       });
     }
 
-    const user = await User.findById(userId);
+    // Try to resolve user from Authorization token if present, otherwise fall back to userId in body
+    let user = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const jwt = require("jsonwebtoken");
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userIdFromToken = decoded.id || decoded._id || decoded.userId || decoded.user?.id;
+        if (userIdFromToken) {
+          user = await User.findById(userIdFromToken);
+        }
+      } catch (err) {
+        // ignore token errors here - we'll fall back to userId in body
+        console.log("Auth token ignored for email OTP verify:", err.message);
+      }
+    }
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
+      user = await User.findById(userId);
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     if (!twoFactorAuthService.is2FAEnabled(user)) {
@@ -444,6 +465,502 @@ exports.regenerateBackupCodes = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to regenerate backup codes",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc Setup email OTP for user
+ * @route POST /api/auth/2fa/email-otp/setup
+ * @access Private
+ */
+exports.setupEmailOTP = async (req, res) => {
+  try {
+    console.log("📧 [setupEmailOTP] incoming request", { authHeader: !!req.headers.authorization });
+    console.log("📧 [setupEmailOTP] req.user present:", req.user ? { id: req.user._id, email: req.user.email } : null);
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check if email OTP is already enabled
+    if (emailOTPService.isEmailOTPEnabled(user)) {
+      return res.status(400).json({
+        success: false,
+        message: "Email OTP is already enabled. Disable it first to set up again.",
+      });
+    }
+
+    // Generate OTP code
+    const otp = emailOTPService.generateOTP();
+    const hashedOTP = emailOTPService.hashOTP(otp);
+    const expiresAt = emailOTPService.calculateOTPExpiration();
+
+    // Store OTP temporarily (not enabled yet)
+    user.emailOTP = {
+      ...user.emailOTP,
+      code: hashedOTP,
+      expiresAt: expiresAt,
+      attempts: 0,
+      enabled: false,
+      lastSentAt: new Date(),
+    };
+    await user.save();
+
+    // Send OTP via email
+    const emailResult = await emailOTPService.sendOTPEmail(
+      user.email,
+      user.name,
+      otp
+    );
+
+    if (!emailResult.success) {
+      console.error("Failed to send OTP email:", emailResult.error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP email. Please try again.",
+        error: emailResult.error,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Email OTP setup initiated. Check your email for the code.",
+      data: {
+        email: user.email,
+        validityMinutes: emailOTPService.getOTPValidityMinutes(),
+        maxAttempts: emailOTPService.getMaxOTPAttempts(),
+      },
+    });
+  } catch (error) {
+    console.error("Email OTP setup error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to setup email OTP",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc Verify and enable email OTP
+ * @route POST /api/auth/2fa/email-otp/verify-setup
+ * @access Private
+ */
+exports.verifyAndEnableEmailOTP = async (req, res) => {
+  try {
+    const { otp } = req.body;
+
+    if (!otp || !emailOTPService.isValidOTPFormat(otp)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP format. Provide 6-digit code.",
+      });
+    }
+
+    console.log("📧 [verifyAndEnableEmailOTP] incoming request", { authHeader: !!req.headers.authorization });
+    console.log("📧 [verifyAndEnableEmailOTP] req.user present:", req.user ? { id: req.user._id, email: req.user.email } : null);
+
+    const user = await User.findById(req.user._id);
+
+    if (!user || !user.emailOTP || !user.emailOTP.code) {
+      return res.status(400).json({
+        success: false,
+        message: "Email OTP setup not initiated. Call /setup first.",
+      });
+    }
+
+    // Check if OTP has expired
+    if (emailOTPService.isOTPExpired(user.emailOTP.expiresAt)) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP has expired. Request a new one.",
+      });
+    }
+
+    // Verify OTP
+    const verification = emailOTPService.verifyOTP(
+      otp,
+      user.emailOTP.code,
+      user.emailOTP.expiresAt
+    );
+
+    if (!verification.valid) {
+      // Increment attempts
+      user.emailOTP.attempts = (user.emailOTP.attempts || 0) + 1;
+      await user.save();
+
+      if (user.emailOTP.attempts >= emailOTPService.getMaxOTPAttempts()) {
+        return res.status(400).json({
+          success: false,
+          message: "Max OTP attempts exceeded. Request a new OTP.",
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP. Please try again.",
+        data: {
+          attemptsRemaining: emailOTPService.getMaxOTPAttempts() - user.emailOTP.attempts,
+        },
+      });
+    }
+
+    // Enable email OTP
+    user.emailOTP = {
+      enabled: true,
+      code: null,
+      expiresAt: null,
+      attempts: 0,
+      maxAttempts: emailOTPService.getMaxOTPAttempts(),
+      lastSentAt: user.emailOTP.lastSentAt,
+      enabledAt: new Date(),
+    };
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Email OTP enabled successfully",
+      data: {
+        email: user.email,
+        enabled: true,
+        enabledAt: user.emailOTP.enabledAt,
+      },
+    });
+  } catch (error) {
+    console.error("Email OTP verification error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify email OTP",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc Verify email OTP during login
+ * @route POST /api/auth/2fa/email-otp/verify
+ * @access Public (but requires userId)
+ */
+exports.verifyEmailOTPToken = async (req, res) => {
+  try {
+    const { userId, otp } = req.body;
+
+    if (!userId || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID and OTP are required",
+      });
+    }
+
+    if (!emailOTPService.isValidOTPFormat(otp)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP format. Provide 6-digit code.",
+      });
+    }
+
+    console.log("📧 [verifyEmailOTPToken] incoming request", { authHeader: !!req.headers.authorization, bodyUserId: userId });
+    // Try to resolve user from Authorization token if present, otherwise fall back to userId in body
+    let user = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const jwt = require("jsonwebtoken");
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userIdFromToken = decoded.id || decoded._id || decoded.userId || decoded.user?.id;
+        if (userIdFromToken) {
+          user = await User.findById(userIdFromToken);
+        }
+      } catch (err) {
+        // ignore token errors here - we'll fall back to userId in body
+        console.log("Auth token ignored for email OTP verify (login flow):", err.message);
+      }
+    }
+
+    if (!user) {
+      user = await User.findById(userId);
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Ensure an OTP was issued and is present in DB
+    if (!user.emailOTP || !user.emailOTP.code || !user.emailOTP.expiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: "No active OTP for this user. Request a new code.",
+      });
+    }
+
+    // Verify OTP using service
+    const verification = emailOTPService.verifyOTP(
+      otp,
+      user.emailOTP.code,
+      user.emailOTP.expiresAt
+    );
+
+    if (!verification.valid) {
+      // Increment attempts and save
+      user.emailOTP.attempts = (user.emailOTP.attempts || 0) + 1;
+      await user.save();
+
+      if (user.emailOTP.attempts >= emailOTPService.getMaxOTPAttempts()) {
+        return res.status(400).json({
+          success: false,
+          message: "Max OTP attempts exceeded. Request a new OTP.",
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP. Please try again.",
+        data: {
+          attemptsRemaining: emailOTPService.getMaxOTPAttempts() - user.emailOTP.attempts,
+        },
+      });
+    }
+
+    // OTP valid - clear temporary OTP fields (keep emailOTP.enabled as-is)
+    user.emailOTP.code = null;
+    user.emailOTP.expiresAt = null;
+    user.emailOTP.attempts = 0;
+    await user.save();
+
+    const jwt = require("jsonwebtoken");
+
+    // Generate auth token
+    const userRole = "user"; // Email OTP is only for citizens
+    const tokenPayload = {
+      id: user._id,
+      role: userRole,
+      ward: user.ward,
+    };
+    const authToken = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: "7d" });
+
+    console.log("✅ Email OTP verification successful:", { email: user.email, role: userRole });
+
+    // Build response
+    const responseData = {
+      token: authToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: userRole,
+        createdAt: user.createdAt,
+      },
+    };
+
+    if (user.ward) responseData.user.ward = user.ward;
+
+    return res.status(200).json({ success: true, message: "Email OTP verified", data: responseData });
+  } catch (error) {
+    console.error("Email OTP verification error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify email OTP",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc Resend email OTP
+ * @route POST /api/auth/2fa/email-otp/resend (authenticated)
+ * @route POST /api/auth/2fa/email-otp/resend-login (during login with userId)
+ * @access Private/Public
+ */
+exports.resendEmailOTP = async (req, res) => {
+  try {
+    let user;
+    
+    // Check if authenticated (has req.user from middleware)
+    if (req.user?._id) {
+      user = await User.findById(req.user._id);
+    } else {
+      // For login flow, userId should be in body
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          message: "User ID is required",
+        });
+      }
+      user = await User.findById(userId);
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Generate new OTP
+    const otp = emailOTPService.generateOTP();
+    const hashedOTP = emailOTPService.hashOTP(otp);
+    const expiresAt = emailOTPService.calculateOTPExpiration();
+
+    // Update OTP in database
+    user.emailOTP = {
+      ...user.emailOTP,
+      code: hashedOTP,
+      expiresAt: expiresAt,
+      attempts: 0,
+      lastSentAt: new Date(),
+    };
+    await user.save();
+
+    // Send OTP via email
+    const emailResult = await emailOTPService.sendOTPEmail(
+      user.email,
+      user.name,
+      otp
+    );
+
+    if (!emailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP email",
+        error: emailResult.error,
+      });
+    }
+
+    // If this resend was part of a login flow (no authenticated req.user), return a short-lived setup token
+    const jwt = require('jsonwebtoken');
+    const responseData = {
+      email: user.email,
+      validityMinutes: emailOTPService.getOTPValidityMinutes(),
+    };
+
+    if (!req.user) {
+      // Issue a temporary setup token so the frontend can use it to verify the OTP
+      const setupToken = jwt.sign({ id: user._id, email: user.email, role: 'user' }, process.env.JWT_SECRET, { expiresIn: '15m' });
+      responseData.setupToken = setupToken;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "OTP resent successfully. Check your email.",
+      data: responseData,
+    });
+  } catch (error) {
+    console.error("Email OTP resend error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to resend email OTP",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc Get email OTP status
+ * @route GET /api/auth/2fa/email-otp/status
+ * @access Private
+ */
+exports.getEmailOTPStatus = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const status = {
+      enabled: emailOTPService.isEmailOTPEnabled(user),
+      enabledAt: user.emailOTP?.enabledAt || null,
+      lastSentAt: user.emailOTP?.lastSentAt || null,
+    };
+
+    res.status(200).json({
+      success: true,
+      data: status,
+    });
+  } catch (error) {
+    console.error("Email OTP status error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch email OTP status",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc Disable email OTP
+ * @route POST /api/auth/2fa/email-otp/disable
+ * @access Private
+ */
+exports.disableEmailOTP = async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: "Password is required to disable email OTP",
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Verify password
+    const passwordMatch = await user.matchPassword(password);
+    if (!passwordMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Incorrect password",
+      });
+    }
+
+    if (!emailOTPService.isEmailOTPEnabled(user)) {
+      return res.status(400).json({
+        success: false,
+        message: "Email OTP is not enabled",
+      });
+    }
+
+    // Disable email OTP
+    user.emailOTP = {
+      enabled: false,
+      code: null,
+      expiresAt: null,
+      attempts: 0,
+      maxAttempts: emailOTPService.getMaxOTPAttempts(),
+      lastSentAt: null,
+      enabledAt: null,
+    };
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Email OTP disabled successfully",
+    });
+  } catch (error) {
+    console.error("Email OTP disable error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to disable email OTP",
       error: error.message,
     });
   }

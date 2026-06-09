@@ -123,15 +123,18 @@ exports.is2FAEnabled = (user) => {
  * This ensures 2FA is required every time, regardless of previous sessions
  */
 exports.is2FARequired = (user) => {
-  // ALWAYS require 2FA for all users on every login attempt
-  // This enforces mandatory 2FA as per security requirements
-  console.log("🔐 2FA Required check:", { 
-    userId: user._id, 
-    email: user.email,
-    twoFactorAuth: user.twoFactorAuth,
-    enabled: user.twoFactorAuth?.enabled 
+  // Require 2FA only when at least one method is enabled (TOTP or Email OTP)
+  const enabled = (user.twoFactorAuth && user.twoFactorAuth.enabled === true) ||
+                  (user.emailOTP && user.emailOTP.enabled === true);
+  console.log("🔐 2FA Required check:", {
+    userId: user?._id,
+    email: user?.email,
+    twoFactorAuthEnabled: user?.twoFactorAuth?.enabled || false,
+    emailOTPEnabled: user?.emailOTP?.enabled || false,
+    result: enabled,
   });
-  return true;
+
+  return !!enabled;
 };
 
 /**
@@ -146,6 +149,29 @@ exports.validateSetup = (user, token) => {
   }
 
   return exports.verifyToken(token, user.twoFactorAuth.tempSecret);
+};
+
+/**
+ * Check if user has any 2FA method enabled
+ * @param {Object} user - User object
+ * @returns {boolean} True if TOTP or Email OTP is enabled
+ */
+exports.has2FAMethodEnabled = (user) => {
+  const hasTOTP = user.twoFactorAuth && user.twoFactorAuth.enabled === true;
+  const hasEmailOTP = user.emailOTP && user.emailOTP.enabled === true;
+  return hasTOTP || hasEmailOTP;
+};
+
+/**
+ * Get available 2FA methods for user
+ * @param {Object} user - User object
+ * @returns {Object} { totp: boolean, emailOTP: boolean }
+ */
+exports.getAvailable2FAMethods = (user) => {
+  return {
+    totp: exports.is2FAEnabled(user),
+    emailOTP: user.emailOTP && user.emailOTP.enabled === true,
+  };
 };
 
 module.exports = exports;

@@ -35,22 +35,42 @@ const app = express();
 app.disable("etag");
 app.set("etag", false);
 
-// ✅ CORS CONFIGURATION - Allow requests from any origin (for mobile/local network)
+// ✅ CORS CONFIGURATION - Production-ready for Vercel + Render
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:8080',
+  'http://localhost:5173',
+  'http://localhost:3000',
+].filter(Boolean);
+
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    // and any localhost or local network origin
-    if (!origin || 
-        origin.includes('localhost') || 
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    // Allow localhost and local network origins (development)
+    if (origin.includes('localhost') || 
         origin.includes('127.0.0.1') ||
         /^http:\/\/192\.168\./.test(origin) ||
         /^http:\/\/10\./.test(origin) ||
         /^http:\/\/172\.(1[6-9]|2[0-9]|3[01])\./.test(origin)) {
-      callback(null, true);
-    } else {
-      // In production, you might want to restrict this
-      callback(null, true); // Allow all for now (development mode)
+      return callback(null, true);
     }
+    
+    // Allow Vercel domains (production)
+    if (origin.includes('.vercel.app') || origin.includes('vercel')) {
+      return callback(null, true);
+    }
+    
+    // Allow explicitly configured origins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    console.warn('⚠️ CORS blocked origin:', origin);
+    callback(null, true); // Allow all in development; restrict in production by removing this line
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],

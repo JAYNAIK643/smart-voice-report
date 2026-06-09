@@ -139,6 +139,37 @@ const userSchema = new mongoose.Schema(
         default: null,
       },
     },
+    // Email-based OTP Settings (alternative 2FA method)
+    emailOTP: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      code: {
+        type: String,
+        default: null,
+      },
+      expiresAt: {
+        type: Date,
+        default: null,
+      },
+      attempts: {
+        type: Number,
+        default: 0,
+      },
+      maxAttempts: {
+        type: Number,
+        default: 5,
+      },
+      lastSentAt: {
+        type: Date,
+        default: null,
+      },
+      enabledAt: {
+        type: Date,
+        default: null,
+      },
+    },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

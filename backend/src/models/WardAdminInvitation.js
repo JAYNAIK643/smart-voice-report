@@ -5,7 +5,6 @@ const wardAdminInvitationSchema = new mongoose.Schema(
     email: {
       type: String,
       required: true,
-      unique: true,
       lowercase: true,
       trim: true,
     },
@@ -21,13 +20,12 @@ const wardAdminInvitationSchema = new mongoose.Schema(
     },
     invitedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Admin",
       required: true,
     },
     token: {
       type: String,
       required: true,
-      unique: true,
     },
     expiresAt: {
       type: Date,

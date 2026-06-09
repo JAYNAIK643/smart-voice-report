@@ -48,6 +48,15 @@ exports.createWardAdminInvitation = async (req, res, next) => {
       });
     }
 
+    // Clean up stale invitations (expired or already used) for this email
+    await WardAdminInvitation.deleteMany({
+      email,
+      $or: [
+        { isUsed: true },
+        { expiresAt: { $lt: new Date() } },
+      ],
+    });
+
     // Check ONLY if an active invitation already exists
     const existingInvitation = await WardAdminInvitation.findOne({ email });
     if (existingInvitation && !existingInvitation.isUsed && existingInvitation.expiresAt > new Date()) {
@@ -80,36 +89,45 @@ exports.createWardAdminInvitation = async (req, res, next) => {
       expiresAt: invitation.expiresAt,
     });
 
+    // Build the invitation link
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
+    const invitationLink = `${frontendUrl}/#/verify-ward-admin/${token}`;
+
     // Send invitation email
     console.log("📧 Triggering ward admin invitation email send...");
     const emailResult = await sendWardAdminInvitationEmail(
       email,
       name,
       ward,
-      `${process.env.FRONTEND_URL || "http://localhost:8080"}/verify-ward-admin/${token}`
+      invitationLink
     );
     console.log("📧 Invitation email result:", emailResult);
 
+    const responseData = {
+      id: invitation._id,
+      email: invitation.email,
+      name: invitation.name,
+      ward: invitation.ward,
+      expiresAt: invitation.expiresAt,
+      invitationLink,
+    };
+
     if (!emailResult.success) {
-      // If email fails, delete the invitation
-      await WardAdminInvitation.findByIdAndDelete(invitation._id);
-      console.log("🗑️ Invitation deleted due to email failure:", invitation._id);
-      return res.status(500).json({
-        success: false,
-        message: `Failed to send invitation email. ${emailResult.error || "Please verify email service configuration and try again."}`,
+      // Email failed — but invitation is valid. Return link so admin can share it manually.
+      console.warn("⚠️ Email delivery failed, invitation preserved. Link:", invitationLink);
+      return res.status(201).json({
+        success: true,
+        emailSent: false,
+        message: `Invitation created but email could not be sent (${emailResult.error || "SMTP not configured"}). Share the invitation link below with ${name}.`,
+        data: responseData,
       });
     }
 
     res.status(201).json({
       success: true,
-      message: "Ward Admin invitation sent successfully",
-      data: {
-        id: invitation._id,
-        email: invitation.email,
-        name: invitation.name,
-        ward: invitation.ward,
-        expiresAt: invitation.expiresAt,
-      },
+      emailSent: true,
+      message: "Ward Admin invitation sent successfully via email",
+      data: responseData,
     });
   } catch (error) {
     next(error);
@@ -365,23 +383,30 @@ exports.resendInvitation = async (req, res, next) => {
       await invitation.save();
     }
 
+    // Build invitation link (HashRouter format)
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
+    const invitationLink = `${frontendUrl}/#/verify-ward-admin/${invitation.token}`;
+
     // Send invitation email
     const emailResult = await sendWardAdminInvitationEmail(
       invitation.email,
       invitation.name,
       invitation.ward,
-      `${process.env.FRONTEND_URL || "http://localhost:8080"}/verify-ward-admin/${invitation.token}`
+      invitationLink
     );
 
     if (!emailResult.success) {
-      return res.status(500).json({
-        success: false,
-        message: `Failed to send invitation email. ${emailResult.error || "Please verify email service configuration and try again."}`,
+      return res.status(200).json({
+        success: true,
+        emailSent: false,
+        message: `Invitation preserved but email could not be sent (${emailResult.error || "SMTP not configured"}). Share the link manually.`,
+        data: { invitationLink },
       });
     }
 
     res.status(200).json({
       success: true,
+      emailSent: true,
       message: "Invitation email resent successfully",
     });
   } catch (error) {

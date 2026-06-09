@@ -21,6 +21,9 @@ const VerifyWardAdmin = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  // Backend URL accessible to all functions in this component
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+
   useEffect(() => {
     if (!token) {
       navigate("/");
@@ -33,7 +36,6 @@ const VerifyWardAdmin = () => {
 
   const verifyToken = async () => {
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
       const response = await fetch(`${backendUrl}/api/ward-admin/verify/${token}`, {
         method: "GET",
         headers: {

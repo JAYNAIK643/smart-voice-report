@@ -56,7 +56,8 @@ const VerifyWardAdmin = () => {
       } else if (response.status === 400 && data.message.includes("Invitation has expired")) {
         setError("This invitation has expired. Please request a new one from your administrator.");
       } else if (response.status === 409) {
-        setError("A user with this email already exists. Please contact your administrator.");
+        const conflictInfo = data.data?.conflictIn ? ` (found in: ${data.data.conflictIn})` : "";
+        setError(`This email already exists${conflictInfo}. Ask the Super Admin to delete the old account first, then retry the invitation.`);
       } else {
         setError(data.message || "Failed to verify invitation. Please try again.");
       }

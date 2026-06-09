@@ -184,15 +184,19 @@ exports.verifyInvitationToken = async (req, res, next) => {
       });
     }
 
-    // Check if user already exists in ANY collection
+    // Check if user already exists in ANY collection — report WHICH one
     const existingUser = await User.findOne({ email });
     const existingAdmin = await Admin.findOne({ email });
     const existingWardAdmin = await WardAdmin.findOne({ email });
     
     if (existingUser || existingAdmin || existingWardAdmin) {
+      const conflictingCollection = existingUser ? "users (citizen)" : existingAdmin ? "admins (super admin)" : "wardadmins (ward admin)";
+      const conflictingDoc = existingUser || existingAdmin || existingWardAdmin;
+      console.warn(`\u274c CONFLICT: Email "${email}" already exists in "${conflictingCollection}" collection (id: ${conflictingDoc._id})`);
       return res.status(409).json({
         success: false,
-        message: "A user with this email already exists",
+        message: `A user with this email already exists as a ${conflictingCollection}. Contact the Super Admin to remove the existing account first.`,
+        data: { conflictIn: conflictingCollection },
       });
     }
 
@@ -262,15 +266,18 @@ exports.verifyInvitationAndSignup = async (req, res, next) => {
       });
     }
 
-    // Check if user already exists in ANY collection (shouldn't happen, but double-check)
+    // Check if user already exists in ANY collection — report WHICH one
     const existingUser = await User.findOne({ email });
     const existingAdmin = await Admin.findOne({ email });
     const existingWardAdmin = await WardAdmin.findOne({ email });
     
     if (existingUser || existingAdmin || existingWardAdmin) {
+      const conflictingCollection = existingUser ? "users (citizen)" : existingAdmin ? "admins (super admin)" : "wardadmins (ward admin)";
+      console.warn(`\u274c SIGNUP CONFLICT: Email "${email}" already exists in "${conflictingCollection}" collection`);
       return res.status(409).json({
         success: false,
-        message: "A user with this email already exists",
+        message: `Cannot create account — this email already exists as a ${conflictingCollection}.`,
+        data: { conflictIn: conflictingCollection },
       });
     }
 

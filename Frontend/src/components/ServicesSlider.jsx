@@ -75,7 +75,7 @@ const ServicesSlider = () => {
           viewport={{ once: true }}
           className="text-center mb-12"
         >
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
             Our{" "}
             <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Services
@@ -87,7 +87,7 @@ const ServicesSlider = () => {
         </motion.div>
 
         <div className="relative max-w-5xl mx-auto">
-          <div className="relative h-[500px] rounded-3xl overflow-hidden shadow-elevated">
+          <div className="relative h-[380px] sm:h-[420px] md:h-[500px] rounded-3xl overflow-hidden shadow-elevated">
             <AnimatePresence mode="wait">
               <motion.div
                 key={safeSlideIndex}
@@ -102,7 +102,7 @@ const ServicesSlider = () => {
                 />
 
                 <div className="relative h-full flex items-center">
-                  <div className="container mx-auto px-8">
+                  <div className="container mx-auto px-4 sm:px-8">
                     <div className="grid md:grid-cols-2 gap-8 items-center">
                       {/* TEXT */}
                       <motion.div
@@ -111,10 +111,10 @@ const ServicesSlider = () => {
                         transition={{ delay: 0.2 }}
                         className="text-white"
                       >
-                        <h3 className="text-4xl md:text-5xl font-bold mb-4">
+                        <h3 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4">
                           {currentSlideData.title}
                         </h3>
-                        <p className="text-xl mb-8 text-white/90">
+                        <p className="text-base sm:text-xl mb-4 sm:mb-8 text-white/90">
                           {currentSlideData.description}
                         </p>
                         <Button
@@ -141,7 +141,7 @@ const ServicesSlider = () => {
                             loop
                             muted
                             playsInline
-                            className="w-150 h-150 object-contain drop-shadow-2xl rounded-2xl"
+                            className="w-40 h-40 sm:w-52 sm:h-52 md:w-60 md:h-60 object-contain drop-shadow-2xl rounded-2xl"
                           />
                         )}
                       </motion.div>

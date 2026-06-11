@@ -185,7 +185,7 @@ const About = () => {
             animate={{ opacity: 1, y: 0 }}
             className="text-center max-w-3xl mx-auto"
           >
-            <h1 className="text-5xl md:text-6xl font-bold mb-6">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
               About{" "}
               <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                 SmartCity Portal

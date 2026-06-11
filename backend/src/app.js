@@ -70,7 +70,11 @@ const corsOptions = {
     }
     
     console.warn('⚠️ CORS blocked origin:', origin);
-    callback(null, true); // Allow all in development; restrict in production by removing this line
+    // Only allow unknown origins in development; block in production
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],

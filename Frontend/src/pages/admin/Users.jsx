@@ -192,17 +192,19 @@ const Users = () => {
         </div>
 
         {isAdmin && (
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-foreground whitespace-nowrap">Filter by Role:</label>
-            <select 
-              value={filterRole}
-              onChange={(e) => setFilterRole(e.target.value)}
-              className="w-48 px-4 py-2.5 bg-background border border-input rounded-lg text-foreground text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all duration-200 hover:border-primary/50 appearance-none cursor-pointer"
-            >
-              <option value="all">All Admin Roles</option>
-              <option value="ward_admin">Ward Admins</option>
-              <option value="admin">Super Admins</option>
-            </select>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-foreground whitespace-nowrap">Filter by Role:</label>
+              <select 
+                value={filterRole}
+                onChange={(e) => setFilterRole(e.target.value)}
+                className="w-full sm:w-48 px-4 py-2.5 bg-background border border-input rounded-lg text-foreground text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all duration-200 hover:border-primary/50 appearance-none cursor-pointer"
+              >
+                <option value="all">All Admin Roles</option>
+                <option value="ward_admin">Ward Admins</option>
+                <option value="admin">Super Admins</option>
+              </select>
+            </div>
             <Dialog open={isInviteModalOpen} onOpenChange={(open) => { setIsInviteModalOpen(open); if (!open) { setInvitationLink(null); setLinkCopied(false); } }}>
               <DialogTrigger asChild>
                 <Button className="bg-primary hover:bg-primary/90">

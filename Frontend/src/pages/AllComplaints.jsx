@@ -403,8 +403,8 @@ const AllComplaints = () => {
       <div className="max-w-6xl mx-auto">
         {/* HEADER */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2 text-white">All Complaints</h1>
-          <p className="text-gray-400">
+          <h1 className="text-3xl font-bold mb-2 text-foreground">All Complaints</h1>
+          <p className="text-muted-foreground">
             View complaints submitted by all citizens
           </p>
         </div>
@@ -477,13 +477,13 @@ const AllComplaints = () => {
         {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className="text-gray-400">Loading complaints...</p>
+            <p className="text-muted-foreground">Loading complaints...</p>
           </div>
         ) : complaints.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-6xl mb-4">📢</div>
-            <h3 className="text-xl font-semibold text-gray-300 mb-2">No Complaints Found</h3>
-            <p className="text-gray-500">Try adjusting your filters or check back later</p>
+            <h3 className="text-xl font-semibold text-foreground mb-2">No Complaints Found</h3>
+            <p className="text-muted-foreground">Try adjusting your filters or check back later</p>
           </div>
         ) : (
           <>
@@ -563,52 +563,69 @@ const AllComplaints = () => {
             </div>
 
             {/* Pagination */}
-            {complaints.length > itemsPerPage && (
-              <div className="flex justify-center items-center gap-2 mt-10">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="gap-1"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
+            {complaints.length > itemsPerPage && (() => {
+              const totalPages = Math.ceil(complaints.length / itemsPerPage);
+              const pages = [];
+              const maxVisible = 5;
 
-                <div className="flex gap-1">
-                  {Array.from(
-                    { length: Math.ceil(complaints.length / itemsPerPage) },
-                    (_, i) => i + 1
-                  ).map((pageNum) => (
-                    <Button
-                      key={pageNum}
-                      variant={currentPage === pageNum ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(pageNum)}
-                      className="min-w-[40px]"
-                    >
-                      {pageNum}
-                    </Button>
-                  ))}
+              if (totalPages <= maxVisible) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+              } else {
+                pages.push(1);
+                let start = Math.max(2, currentPage - 1);
+                let end = Math.min(totalPages - 1, currentPage + 1);
+                if (currentPage <= 3) { start = 2; end = 4; }
+                if (currentPage >= totalPages - 2) { start = totalPages - 3; end = totalPages - 1; }
+                if (start > 2) pages.push('...');
+                for (let i = start; i <= end; i++) pages.push(i);
+                if (end < totalPages - 1) pages.push('...');
+                pages.push(totalPages);
+              }
+
+              return (
+                <div className="flex flex-wrap justify-center items-center gap-1 sm:gap-2 mt-10">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="gap-1 text-xs sm:text-sm"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span className="hidden sm:inline">Previous</span>
+                  </Button>
+
+                  <div className="flex flex-wrap gap-1">
+                    {pages.map((pageNum, idx) =>
+                      pageNum === '...' ? (
+                        <span key={`ellipsis-${idx}`} className="min-w-[32px] h-9 flex items-center justify-center text-sm text-muted-foreground">…</span>
+                      ) : (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className="min-w-[32px] sm:min-w-[40px] text-xs sm:text-sm"
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    )}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="gap-1 text-xs sm:text-sm"
+                  >
+                    <span className="hidden sm:inline">Next</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage((p) =>
-                      Math.min(Math.ceil(complaints.length / itemsPerPage), p + 1)
-                    )
-                  }
-                  disabled={currentPage === Math.ceil(complaints.length / itemsPerPage)}
-                  className="gap-1"
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+              );
+            })()}
           </>
         )}
       </div>

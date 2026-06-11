@@ -156,7 +156,7 @@ const TrackComplaint = () => {
       <section className="container mx-auto px-4 max-w-4xl">
         <header className="text-center mb-12">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <h1 className="text-5xl font-bold mb-4">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
               Track Your{" "}
               <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                 Complaint
@@ -175,13 +175,13 @@ const TrackComplaint = () => {
           transition={{ delay: 0.15 }}
           className="mb-10"
         >
-          <form onSubmit={handleSearch} className="flex gap-4">
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
             <Input
               type="text"
               placeholder="Enter your Complaint ID"
               value={complaintId}
               onChange={(e) => setComplaintId(e.target.value)}
-              className="flex-1 h-14 text-lg"
+              className="w-full sm:flex-1 h-14 text-lg"
               required
               aria-label="Complaint ID"
             />
@@ -189,7 +189,7 @@ const TrackComplaint = () => {
               type="submit"
               variant="hero"
               size="lg"
-              className="px-8"
+              className="w-full sm:w-auto px-8"
               disabled={searching}
             >
               <Search className="mr-2" />

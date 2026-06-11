@@ -211,7 +211,7 @@ const Footer = () => {
         }}
         transition={{ duration: 0.3 }}
         onClick={scrollToTop}
-        className="fixed bottom-8 right-8 w-12 h-12 rounded-full gradient-button text-white shadow-elevated flex items-center justify-center z-50 hover:shadow-glow transition-all"
+        className="fixed bottom-8 right-8 w-12 h-12 rounded-full gradient-button text-white shadow-elevated items-center justify-center z-40 hover:shadow-glow transition-all hidden md:flex"
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         aria-label="Back to top"

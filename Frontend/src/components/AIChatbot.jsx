@@ -614,7 +614,7 @@ export const AIChatbot = () => {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg shadow-primary/25 flex items-center justify-center"
+            className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg shadow-primary/25 flex items-center justify-center"
           >
             <MessageCircle className="w-6 h-6" />
             <motion.span 
@@ -637,11 +637,11 @@ export const AIChatbot = () => {
               opacity: 1, 
               scale: 1, 
               y: 0,
-              height: isMinimized ? 60 : 550
+              height: isMinimized ? 60 : 'min(550px, 70vh)'
             }}
             exit={{ opacity: 0, scale: 0.8, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed bottom-6 right-6 z-50 w-[380px] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            className="fixed bottom-20 md:bottom-6 right-2 md:right-6 z-50 w-[calc(100vw-1rem)] sm:w-[380px] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[70vh] md:max-h-none"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground">

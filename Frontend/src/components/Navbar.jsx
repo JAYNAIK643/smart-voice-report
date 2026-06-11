@@ -285,14 +285,24 @@ const Navbar = () => {
                       </Button>
                     </Link>
                     {showAdminButton && (
-                      <Button
-                        variant="outline"
-                        className="w-full flex items-center justify-center gap-2"
-                        onClick={handleAdminClick}
-                      >
-                        <Shield className="w-4 h-4" />
-                        Admin Login
-                      </Button>
+                      <>
+                        <Button
+                          variant="outline"
+                          className="w-full flex items-center justify-center gap-2"
+                          onClick={handleAdminClick}
+                        >
+                          <Shield className="w-4 h-4" />
+                          Admin Login
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full flex items-center justify-center gap-2"
+                          onClick={() => { navigate("/ward-admin-login"); setIsOpen(false); }}
+                        >
+                          <Shield className="w-4 h-4" />
+                          Ward Admin Login
+                        </Button>
+                      </>
                     )}
                   </div>
                 )}

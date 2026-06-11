@@ -39,16 +39,84 @@ const WardAdminComplaints = () => {
     }
   };
 
-  const handleStatusChange = (complaintId, newStatus) => {
+  const handleStatusChange = async (complaintId, newStatus) => {
+    // Optimistic local update
+    const prevComplaints = complaints;
     setComplaints(complaints.map(c => 
       c.complaintId === complaintId ? { ...c, status: newStatus } : c
     ));
+    
+    // Find the complaint to get current priority for the API call
+    const complaint = complaints.find(c => c.complaintId === complaintId);
+    if (!complaint) return;
+
+    try {
+      setUpdatingIds(prev => new Set(prev).add(complaintId));
+      const response = await apiService.updateGrievanceStatus(complaintId, newStatus, complaint.priority);
+      if (response.success) {
+        toast({
+          title: "Status Updated",
+          description: `Complaint ${complaintId} status changed to ${newStatus}.${newStatus === 'resolved' ? ' Email notification sent to the user.' : ''}`,
+        });
+        // Refresh to get authoritative data
+        await fetchWardComplaints();
+      }
+    } catch (error) {
+      // Revert on failure
+      setComplaints(prevComplaints);
+      console.error("Error updating status:", error);
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error.message || "Failed to update status. Please try again.",
+      });
+    } finally {
+      setUpdatingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(complaintId);
+        return newSet;
+      });
+    }
   };
 
-  const handlePriorityChange = (complaintId, newPriority) => {
+  const handlePriorityChange = async (complaintId, newPriority) => {
+    // Optimistic local update
+    const prevComplaints = complaints;
     setComplaints(complaints.map(c => 
       c.complaintId === complaintId ? { ...c, priority: newPriority } : c
     ));
+    
+    // Find the complaint to get current status for the API call
+    const complaint = complaints.find(c => c.complaintId === complaintId);
+    if (!complaint) return;
+
+    try {
+      setUpdatingIds(prev => new Set(prev).add(complaintId));
+      const response = await apiService.updateGrievanceStatus(complaintId, complaint.status, newPriority);
+      if (response.success) {
+        toast({
+          title: "Priority Updated",
+          description: `Complaint ${complaintId} priority changed to ${newPriority}.`,
+        });
+        // Refresh to get authoritative data
+        await fetchWardComplaints();
+      }
+    } catch (error) {
+      // Revert on failure
+      setComplaints(prevComplaints);
+      console.error("Error updating priority:", error);
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error.message || "Failed to update priority. Please try again.",
+      });
+    } finally {
+      setUpdatingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(complaintId);
+        return newSet;
+      });
+    }
   };
 
   const handleUpdate = async (complaint) => {
@@ -131,7 +199,7 @@ const WardAdminComplaints = () => {
         
         {/* Header Section - Centered */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Ward Complaints Management</h1>
               <div className="flex items-center gap-2 mt-2">
@@ -178,9 +246,9 @@ const WardAdminComplaints = () => {
 
         {/* Status Filter Section */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Filter by Status</p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setStatusFilter("all")}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${

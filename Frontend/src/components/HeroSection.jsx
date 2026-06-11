@@ -66,7 +66,7 @@ const HeroSection = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight"
+            className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold text-white mb-6 leading-tight"
           >
             Your Voice,{" "}
             <span className="bg-gradient-to-r from-secondary to-white bg-clip-text text-transparent">
@@ -113,7 +113,7 @@ const HeroSection = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.8 }}
-            className="grid grid-cols-3 gap-8 mt-16 max-w-2xl mx-auto"
+            className="grid grid-cols-3 gap-4 sm:gap-6 md:gap-8 mt-16 max-w-2xl mx-auto"
           >
             {[
               { label: "Active Users", value: "10K+" },
@@ -122,10 +122,10 @@ const HeroSection = () => {
             ].map((stat, index) => (
               <div
                 key={index}
-                className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20"
+                className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/20"
               >
-                <div className="text-3xl font-bold text-white mb-1">{stat.value}</div>
-                <div className="text-sm text-white/80">{stat.label}</div>
+                <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1">{stat.value}</div>
+                <div className="text-xs sm:text-sm text-white/80">{stat.label}</div>
               </div>
             ))}
           </motion.div>

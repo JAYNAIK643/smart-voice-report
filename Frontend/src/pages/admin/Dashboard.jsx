@@ -209,19 +209,20 @@ const Dashboard = () => {
       <div className="max-w-7xl mx-auto px-6 space-y-8">
         
         {/* Header Section */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-2">Admin Dashboard</h1>
-            <p className="text-slate-600 text-lg">Monitor and manage city grievances in real-time</p>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">Admin Dashboard</h1>
+            <p className="text-slate-600 text-sm sm:text-base lg:text-lg">Monitor and manage city grievances in real-time</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
-              <Clock className="h-4 w-4" />
-              <span>Last updated: {new Date(lastRefresh).toLocaleTimeString()}</span>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 bg-white px-3 sm:px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="whitespace-nowrap">Updated: {new Date(lastRefresh).toLocaleTimeString()}</span>
             </div>
             <Button 
               onClick={handleManualRefresh} 
               disabled={isRefreshing} 
+              size="sm"
               className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -271,11 +272,11 @@ const Dashboard = () => {
                   <div className="flex items-end gap-2 mb-2">
                     {stat.isStar && stat.value !== "—" ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-4xl font-bold text-white">{stat.value}</span>
+                        <span className="text-4xl font-bold text-slate-900">{stat.value}</span>
                         <StarRating rating={Math.round(parseFloat(stat.value))} readonly size="sm" />
                       </div>
                     ) : (
-                      <span className="text-4xl font-bold text-white">{stat.value}</span>
+                      <span className="text-4xl font-bold text-slate-900">{stat.value}</span>
                     )}
                   </div>
                   <p className="text-xs text-slate-500 font-medium">{stat.trend}</p>
@@ -477,7 +478,7 @@ const Dashboard = () => {
                           {complaint.priority}
                         </span>
                       </div>
-                      <div className="flex items-center gap-5 text-sm text-slate-600">
+                      <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-sm text-slate-600">
                         <div className="flex items-center gap-1.5">
                           <FileText className="h-4 w-4 text-slate-400" />
                           <span className="font-mono">{complaint.id}</span>

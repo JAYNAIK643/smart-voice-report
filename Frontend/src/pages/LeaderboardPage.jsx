@@ -99,7 +99,7 @@ const LeaderboardPage = () => {
       case 3:
         return <Award className="h-6 w-6 text-orange-500" />;
       default:
-        return <span className="text-lg font-bold text-muted-foreground">#{rank}</span>;
+        return <span className="text-base sm:text-lg font-bold text-muted-foreground">#{rank}</span>;
     }
   };
 
@@ -234,8 +234,8 @@ const LeaderboardPage = () => {
                 transition={{ delay: index * 0.1 }}
                 className="text-center"
               >
-                <stat.icon className={cn("h-8 w-8 mx-auto mb-2", stat.color)} />
-                <p className="text-3xl font-bold text-foreground">{stat.value.toLocaleString()}</p>
+                <stat.icon className={cn("h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2", stat.color)} />
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">{stat.value.toLocaleString()}</p>
                 <p className="text-sm text-muted-foreground">{stat.label}</p>
               </motion.div>
             ))}
@@ -351,7 +351,7 @@ const LeaderboardPage = () => {
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <FileText className="h-3.5 w-3.5" />
                             {contributor.complaints_count} reports

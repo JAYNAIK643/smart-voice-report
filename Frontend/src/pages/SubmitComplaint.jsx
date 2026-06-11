@@ -539,7 +539,7 @@ const SubmitComplaint = () => {
           category: formData.category,
           address: formData.address,
           ward: formData.ward, // Include ward field
-          priority: "high",
+          priority: formData.priority || "medium",
           // Image, video and geolocation data
           imageUrl: imageUrl,
           videoUrl: videoUrl, // Include video URL if uploaded
@@ -638,7 +638,7 @@ const SubmitComplaint = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-12 text-center"
         >
-          <h1 className="text-5xl font-bold mb-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
             Submit a{" "}
             <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Complaint
@@ -650,25 +650,25 @@ const SubmitComplaint = () => {
         </motion.div>
 
         {/* Progress Bar */}
-        <div className="mb-12">
-          <div className="flex justify-between items-center mb-4">
+        <div className="mb-12 overflow-x-auto">
+          <div className="flex justify-between items-center mb-4 min-w-[300px]">
             {steps.map((step, index) => (
               <div key={index} className="flex items-center flex-1">
                 <div className="flex flex-col items-center relative z-10">
                   <motion.div
-                    className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all ${
+                    className={`w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm md:text-base transition-all ${
                       index <= currentStep
                         ? "gradient-button text-white shadow-glow"
                         : "bg-muted text-muted-foreground"
                     }`}
                     whileHover={{ scale: 1.1 }}
                   >
-                    {index < currentStep ? <Check size={20} /> : index + 1}
+                    {index < currentStep ? <Check size={16} /> : index + 1}
                   </motion.div>
-                  <span className="text-sm mt-2 text-center hidden sm:block">{step}</span>
+                  <span className="text-xs sm:text-sm mt-2 text-center hidden sm:block">{step}</span>
                 </div>
                 {index < steps.length - 1 && (
-                  <div className="flex-1 h-1 mx-4 bg-muted relative">
+                  <div className="flex-1 h-1 mx-2 sm:mx-3 md:mx-4 bg-muted relative">
                     <motion.div
                       className="h-full gradient-button"
                       initial={{ width: 0 }}

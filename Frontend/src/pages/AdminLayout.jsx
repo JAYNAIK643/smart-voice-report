@@ -80,8 +80,8 @@ const AdminLayout = () => {
     <div className="admin-layout min-h-screen bg-gray-50">
       <AdminSidebar />
       
-      <main className="pt-16 pl-[200px]">
-        <div className="admin-content p-8">
+      <main className="pt-16 md:pl-[200px]">
+        <div className="admin-content p-4 md:p-8">
           <Outlet />
         </div>
       </main>

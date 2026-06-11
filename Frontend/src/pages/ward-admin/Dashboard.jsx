@@ -181,13 +181,13 @@ const WardAdminDashboard = () => {
 
   return (
     <div className="dashboard-content w-full">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Ward Admin Dashboard</h1>
-          <p className="text-gray-300">Manage complaints for {user?.ward || "your ward"}</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">Ward Admin Dashboard</h1>
+          <p className="text-gray-300 text-sm sm:text-base">Manage complaints for {user?.ward || "your ward"}</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-gray-300">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="text-xs sm:text-sm text-gray-300">
             Last updated: {new Date(lastRefresh).toLocaleTimeString()}
           </div>
           <Button onClick={handleManualRefresh} disabled={isRefreshing} variant="outline" size="sm" className="gap-2">
@@ -252,14 +252,14 @@ const WardAdminDashboard = () => {
         <CardContent>
           <div className="space-y-4">
             {recentComplaints.length > 0 ? recentComplaints.map((complaint) => (
-              <div key={complaint.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-700 bg-gray-700">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="font-medium text-white">{complaint.issue}</span>
+              <div key={complaint.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-lg border border-gray-700 bg-gray-700">
+                <div className="flex-1 min-w-0 w-full">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1">
+                    <span className="font-medium text-white truncate">{complaint.issue}</span>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(complaint.status)}`}>{complaint.status}</span>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(complaint.priority)}`}>{complaint.priority}</span>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-300">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-300">
                     <span>ID: {complaint.id}</span>
                     <span>Ward: {complaint.ward}</span>
                     <span>{complaint.date}</span>

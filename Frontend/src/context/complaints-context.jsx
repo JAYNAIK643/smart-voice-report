@@ -89,11 +89,11 @@ export function ComplaintsProvider({ children }) {
           dispatch({ 
             type: "UPDATE_COMPLAINT", 
             payload: { 
-              complaintId: response.data.grievance.complaintId, 
+              complaintId: response.data.complaintId, 
               patch: { 
-                status: response.data.grievance.status,
-                priority: response.data.grievance.priority,
-                updatedAt: response.data.grievance.updatedAt
+                status: response.data.status,
+                priority: response.data.priority,
+                updatedAt: response.data.updatedAt
               } 
             } 
           });

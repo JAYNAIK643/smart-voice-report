@@ -154,11 +154,11 @@ const PublicIssues = () => {
             <VoiceSearch 
               onSearch={(query) => setSearchQuery(query)}
               placeholder="Search issues by voice or text..."
-              className="w-full lg:w-96"
+              className="w-full lg:w-96 flex-shrink-0"
             />
 
             {/* Filters */}
-            <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center w-full lg:w-auto">
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger className="w-36 bg-background">
                   <SelectValue placeholder="Category" />

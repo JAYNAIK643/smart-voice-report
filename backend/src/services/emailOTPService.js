@@ -9,26 +9,33 @@ const crypto = require("crypto");
 
 /**
  * Create Nodemailer transporter for sending emails
+ * Uses service: 'gmail' (matching the working pattern in emailService.js)
+ * with explicit timeouts to prevent hanging on SMTP failures.
  * @returns {Object|null} Transporter object or null if credentials not configured
  */
 const createTransporter = () => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn("⚠️ Email credentials not configured. Email OTP will not be sent.");
+    console.error("❌ Email credentials not configured. EMAIL_USER or EMAIL_PASS missing.");
+    console.error("   EMAIL_USER set:", !!process.env.EMAIL_USER);
+    console.error("   EMAIL_PASS set:", !!process.env.EMAIL_PASS);
     return null;
   }
 
+  console.log("✅ Email OTP SMTP credentials found:", process.env.EMAIL_USER);
+
   try {
     return nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || "smtp.gmail.com",
-      port: parseInt(process.env.EMAIL_PORT || "587"),
-      secure: process.env.EMAIL_SECURE === "true" || false,
+      service: "gmail",
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
+      connectionTimeout: 10000,  // 10s to establish TCP connection
+      greetingTimeout: 10000,    // 10s for SMTP greeting
+      socketTimeout: 15000,      // 15s for any socket operation
     });
   } catch (error) {
-    console.error("❌ Failed to create email transporter:", error.message);
+    console.error("❌ Failed to create email OTP transporter:", error.message);
     return null;
   }
 };
@@ -282,9 +289,18 @@ exports.generateAndSendOTP = async (user) => {
     await user.save();
 
     const emailResult = await exports.sendOTPEmail(user.email, user.name, otp);
-    
+
+    if (emailResult.success === false) {
+      console.error("❌ OTP email delivery failed for:", user.email, "-", emailResult.message);
+      return {
+        success: false,
+        message: emailResult.message || "Failed to send OTP email"
+      };
+    }
+
+    console.log("✅ OTP generated and email sent successfully to:", user.email);
     return {
-      success: emailResult.success !== false,
+      success: true,
       message: "OTP generated and sent to email"
     };
   } catch (error) {

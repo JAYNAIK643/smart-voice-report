@@ -151,74 +151,43 @@ exports.login = async (req, res, next) => {
       return res.status(403).json({ success: false, message: "Please use admin login portal." });
     }
 
-    // 2FA handling for citizen users
+    // 2FA handling for citizen users — Email OTP ONLY (TOTP disabled)
     if (userRole === "user") {
       const emailOTPService = require("../services/emailOTPService");
-      const hasTOTPEnabled = twoFactorAuthService.is2FAEnabled(user);
-      const hasEmailOTPEnabled = emailOTPService.isEmailOTPEnabled(user);
 
-      // FIRST TIME LOGIN: If no 2FA method exists, auto-enable Email (Gmail) OTP and send code
-      if (!hasTOTPEnabled && !hasEmailOTPEnabled) {
-        try {
-          user.emailOTP = user.emailOTP || {};
-          user.emailOTP.enabled = true; // enable Gmail OTP by default
-          user.emailOTP.enabledAt = new Date();
-          await user.save();
-
-          await emailOTPService.generateAndSendOTP(user);
-
-          const setupToken = jwt.sign(
-            { id: user._id, email: user.email, role: userRole },
-            process.env.JWT_SECRET,
-            { expiresIn: "15m" }
-          );
-
-          return res.status(200).json({
-            success: true,
-            requires2FA: true,
-            method: "email",
-            message: "OTP sent to your email (Gmail OTP enabled by default)",
-            data: { userId: user._id, email: user.email, setupToken },
-          });
-        } catch (err) {
-          console.error("Auto-enable Email OTP error:", err);
-          // Fall through to normal 2FA check below
-        }
+      // Ensure Email OTP is enabled for ALL citizen users (auto-enable if needed)
+      if (!user.emailOTP || !user.emailOTP.enabled) {
+        user.emailOTP = user.emailOTP || {};
+        user.emailOTP.enabled = true;
+        user.emailOTP.enabledAt = new Date();
+        await user.save();
+        console.log("✅ Auto-enabled Email OTP for user:", user.email);
       }
 
-      // Only require 2FA if a method is enabled
-      if (twoFactorAuthService.is2FARequired(user)) {
-        const availableMethods = [];
-        if (hasTOTPEnabled) availableMethods.push("totp");
-        if (hasEmailOTPEnabled) availableMethods.push("email");
+      // Generate and send OTP — ALWAYS required for citizen login
+      const otpResult = await emailOTPService.generateAndSendOTP(user);
 
-        // If only email OTP is enabled, auto-send OTP and return special response
-        if (hasEmailOTPEnabled && !hasTOTPEnabled) {
-          await emailOTPService.generateAndSendOTP(user);
-
-          const setupToken = jwt.sign(
-            { id: user._id, email: user.email, role: userRole },
-            process.env.JWT_SECRET,
-            { expiresIn: "15m" }
-          );
-
-          return res.status(200).json({
-            success: true,
-            requires2FA: true,
-            method: "email",
-            message: "OTP sent to your email",
-            data: { userId: user._id, email: user.email, setupToken },
-          });
-        }
-
-        return res.status(200).json({
-          success: true,
-          requiresTwoFactor: true,
-          needs2FASetup: false,
-          message: "2FA verification required",
-          data: { userId: user._id, email: user.email, availableMethods },
+      if (!otpResult.success) {
+        console.error("❌ Failed to send OTP email during login for:", user.email, "-", otpResult.message);
+        return res.status(500).json({
+          success: false,
+          message: "Unable to send verification email. Please try again later or contact support.",
         });
       }
+
+      const setupToken = jwt.sign(
+        { id: user._id, email: user.email, role: userRole },
+        process.env.JWT_SECRET,
+        { expiresIn: "15m" }
+      );
+
+      return res.status(200).json({
+        success: true,
+        requires2FA: true,
+        method: "email",
+        message: "OTP sent to your email",
+        data: { userId: user._id, email: user.email, setupToken },
+      });
     }
 
     // Create JWT token with the determined role

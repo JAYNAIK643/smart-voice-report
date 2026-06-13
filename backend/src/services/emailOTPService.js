@@ -80,7 +80,8 @@ exports.sendOTPEmail = async (userEmail, userName, otp) => {
     return { success: false, message: "Email service not configured" };
   }
 
-  const fromAddress = process.env.EMAIL_FROM || `SmartCity GRS <onboarding@resend.dev>`;
+  // Use Resend's default onboarding sender — no domain verification required
+  const fromAddress = "SmartCity Portal <onboarding@resend.dev>";
 
   const htmlContent = `
       <!DOCTYPE html>

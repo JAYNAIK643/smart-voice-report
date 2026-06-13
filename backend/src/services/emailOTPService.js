@@ -8,9 +8,12 @@ const crypto = require("crypto");
  */
 
 /**
- * Create Nodemailer transporter for sending emails
- * Uses service: 'gmail' (matching the working pattern in emailService.js)
- * with explicit timeouts to prevent hanging on SMTP failures.
+ * Create Nodemailer transporter for sending OTP emails.
+ *
+ * Uses port 465 with direct SSL/TLS (NOT port 587/STARTTLS) because
+ * cloud platforms like Render block outbound port 587 to prevent spam,
+ * causing "Connection timeout" errors. Port 465 is universally allowed.
+ *
  * @returns {Object|null} Transporter object or null if credentials not configured
  */
 const createTransporter = () => {
@@ -22,13 +25,19 @@ const createTransporter = () => {
   }
 
   console.log("✅ Email OTP SMTP credentials found:", process.env.EMAIL_USER);
+  console.log("📧 Email OTP transport config: smtp.gmail.com:465 (SSL/TLS)");
 
   try {
     return nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true, // Use SSL/TLS directly (port 465), NOT STARTTLS (port 587)
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
+      },
+      tls: {
+        rejectUnauthorized: false, // Allow self-signed certs on cloud platforms
       },
       connectionTimeout: 10000,  // 10s to establish TCP connection
       greetingTimeout: 10000,    // 10s for SMTP greeting
@@ -162,15 +171,31 @@ exports.sendOTPEmail = async (userEmail, userName, otp) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
-    console.log("✅ OTP email sent successfully to:", userEmail);
+    const info = await transporter.sendMail(mailOptions);
+    console.log("✅ OTP email sent successfully to:", userEmail, "| messageId:", info.messageId);
     return { success: true, message: "OTP sent to email" };
   } catch (error) {
-    console.error("❌ Failed to send OTP email:", error.message);
+    // Log the FULL error object for Render diagnostics
+    console.error("❌ Failed to send OTP email to:", userEmail);
+    console.error("   error.message:", error.message);
+    console.error("   error.code:", error.code);
+    console.error("   error.command:", error.command);
+    console.error("   error.response:", error.response);
+    console.error("   error.responseCode:", error.responseCode);
+    if (error.code === 'ETIMEDOUT' || error.code === 'ESOCKET') {
+      console.error("   ⚠️  TIMEOUT DETECTED: This is likely a network-level SMTP port block.");
+      console.error("   ⚠️  Ensure port 465 (SSL) is used, NOT port 587 (STARTTLS).");
+      console.error("   ⚠️  Render/Heroku may block outbound SMTP. Consider Resend/SendGrid.");
+    }
+    if (error.code === 'EAUTH') {
+      console.error("   ⚠️  AUTH FAILURE: Gmail App Password is invalid or expired.");
+      console.error("   ⚠️  Generate a new one at: https://myaccount.google.com/apppasswords");
+    }
     return {
       success: false,
       message: "Failed to send OTP email",
       error: error.message,
+      code: error.code,
     };
   }
 };

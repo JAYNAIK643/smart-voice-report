@@ -227,11 +227,17 @@ const createGmailTransporter = () => {
     return null;
   }
   console.log("✅ Gmail SMTP credentials found:", process.env.EMAIL_USER);
+  console.log("📧 Gmail transport config: smtp.gmail.com:465 (SSL/TLS)");
   return nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true, // Direct SSL/TLS (port 465), NOT STARTTLS (port 587)
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
+    },
+    tls: {
+      rejectUnauthorized: false, // Allow self-signed certs on cloud platforms
     },
     // Timeout settings to prevent hanging on slow/failed SMTP connections
     connectionTimeout: 10000,  // 10 seconds to establish TCP connection
@@ -280,25 +286,24 @@ const sendEmailWithFallback = async (mailOptions) => {
   for (const provider of providers) {
     try {
       console.log(`📧 Attempting email send via ${provider.name}`);
-      // Verify SMTP connection before sending
-      if (provider.name === "Gmail") {
-        try {
-          await provider.transporter.verify();
-          console.log("✅ Gmail SMTP connection verified");
-        } catch (verifyErr) {
-          console.error("❌ Gmail SMTP connection failed:", verifyErr.message);
-          throw verifyErr;
-        }
-      }
-      await provider.transporter.sendMail(mailOptions);
-      console.log(`✅ Email sent via ${provider.name} to ${mailOptions.to}`);
+      const info = await provider.transporter.sendMail(mailOptions);
+      console.log(`✅ Email sent via ${provider.name} to ${mailOptions.to} | messageId: ${info.messageId}`);
       return { success: true, provider: provider.name };
     } catch (err) {
       lastError = err;
-      console.error(`EMAIL ERROR (${provider.name}):`, err.message);
+      console.error(`❌ EMAIL ERROR (${provider.name}):`);
+      console.error(`   error.message: ${err.message}`);
+      console.error(`   error.code: ${err.code}`);
+      console.error(`   error.command: ${err.command}`);
+      console.error(`   error.response: ${err.response}`);
+      console.error(`   error.responseCode: ${err.responseCode}`);
       if (err.code === 'EAUTH') {
         console.error("   → Authentication failed. Check EMAIL_PASS (must be a Gmail App Password, not your regular password).");
         console.error("   → Generate App Password: https://myaccount.google.com/apppasswords");
+      }
+      if (err.code === 'ETIMEDOUT' || err.code === 'ESOCKET') {
+        console.error("   → TIMEOUT: Network-level SMTP port block. Ensure port 465 (SSL) is used.");
+        console.error("   → Consider migrating to Resend/SendGrid if Gmail SMTP is unreliable on this platform.");
       }
     }
   }

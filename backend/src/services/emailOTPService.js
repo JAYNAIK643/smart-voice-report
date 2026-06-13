@@ -1,53 +1,33 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const crypto = require("crypto");
 
 /**
  * Email OTP Service
- * Handles email-based one-time password generation, verification, and sending
- * Provides alternative 2FA method to TOTP
+ * Handles email-based one-time password generation, verification, and sending.
+ * Uses Resend API for email delivery (HTTP-based, no SMTP ports required).
+ * This avoids SMTP port blocks on cloud platforms like Render/Heroku.
  */
 
 /**
- * Create Nodemailer transporter for sending OTP emails.
- *
- * Uses port 465 with direct SSL/TLS (NOT port 587/STARTTLS) because
- * cloud platforms like Render block outbound port 587 to prevent spam,
- * causing "Connection timeout" errors. Port 465 is universally allowed.
- *
- * @returns {Object|null} Transporter object or null if credentials not configured
+ * Get a Resend client instance.
+ * Validates RESEND_API_KEY is configured and returns a reusable client.
+ * @returns {Object|null} Resend client or null if not configured
  */
-const createTransporter = () => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.error("❌ Email credentials not configured. EMAIL_USER or EMAIL_PASS missing.");
-    console.error("   EMAIL_USER set:", !!process.env.EMAIL_USER);
-    console.error("   EMAIL_PASS set:", !!process.env.EMAIL_PASS);
+const getResendClient = () => {
+  if (!process.env.RESEND_API_KEY) {
+    console.error("❌ Resend API key not configured. RESEND_API_KEY missing from environment variables.");
+    console.error("   Get your API key at: https://resend.com/api-keys");
     return null;
   }
-
-  console.log("✅ Email OTP SMTP credentials found:", process.env.EMAIL_USER);
-  console.log("📧 Email OTP transport config: smtp.gmail.com:465 (SSL/TLS)");
-
-  try {
-    return nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true, // Use SSL/TLS directly (port 465), NOT STARTTLS (port 587)
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-      tls: {
-        rejectUnauthorized: false, // Allow self-signed certs on cloud platforms
-      },
-      connectionTimeout: 10000,  // 10s to establish TCP connection
-      greetingTimeout: 10000,    // 10s for SMTP greeting
-      socketTimeout: 15000,      // 15s for any socket operation
-    });
-  } catch (error) {
-    console.error("❌ Failed to create email OTP transporter:", error.message);
-    return null;
-  }
+  return new Resend(process.env.RESEND_API_KEY);
 };
+
+// Log Resend configuration status at module load
+if (!process.env.RESEND_API_KEY) {
+  console.warn("⚠️  Email OTP: RESEND_API_KEY not set. OTP emails will NOT be delivered.");
+} else {
+  console.log("✅ Email OTP: Resend API configured and ready.");
+}
 
 /**
  * Generate a 6-digit OTP code
@@ -86,25 +66,23 @@ exports.verifyOTP = (plainOTP, hashedOTP, expiresAt) => {
 };
 
 /**
- * Send OTP via email
+ * Send OTP via Resend API (HTTP-based, no SMTP ports)
  * @param {string} userEmail - Recipient email address
  * @param {string} userName - Recipient name
  * @param {string} otp - Plain text OTP code to send
  * @returns {Promise<Object>} { success: boolean, message: string }
  */
 exports.sendOTPEmail = async (userEmail, userName, otp) => {
-  const transporter = createTransporter();
+  const resend = getResendClient();
 
-  if (!transporter) {
-    console.log("📧 Email OTP skipped (not configured):", userEmail);
+  if (!resend) {
+    console.error("📧 Email OTP skipped (Resend not configured):", userEmail);
     return { success: false, message: "Email service not configured" };
   }
 
-  const mailOptions = {
-    from: process.env.EMAIL_FROM || `SmartCity GRS <${process.env.EMAIL_USER}>`,
-    to: userEmail,
-    subject: "Your One-Time Password (OTP) - SmartCity GRS Login",
-    html: `
+  const fromAddress = process.env.EMAIL_FROM || `SmartCity GRS <onboarding@resend.dev>`;
+
+  const htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -167,35 +145,42 @@ exports.sendOTPEmail = async (userEmail, userName, otp) => {
         </div>
       </body>
       </html>
-    `,
-  };
+  `;
 
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log("✅ OTP email sent successfully to:", userEmail, "| messageId:", info.messageId);
+    const { data, error } = await resend.emails.send({
+      from: fromAddress,
+      to: userEmail,
+      subject: "Your One-Time Password (OTP) - SmartCity GRS Login",
+      html: htmlContent,
+    });
+
+    if (error) {
+      console.error("❌ Resend API returned error for:", userEmail);
+      console.error("   error.message:", error.message);
+      console.error("   error.name:", error.name);
+      console.error("   error.statusCode:", error.statusCode);
+      return {
+        success: false,
+        message: error.message || "Failed to send OTP email via Resend",
+        error: error.message,
+      };
+    }
+
+    console.log("✅ OTP email sent via Resend to:", userEmail, "| id:", data.id);
     return { success: true, message: "OTP sent to email" };
   } catch (error) {
-    // Log the FULL error object for Render diagnostics
-    console.error("❌ Failed to send OTP email to:", userEmail);
+    console.error("❌ Exception sending OTP email to:", userEmail);
     console.error("   error.message:", error.message);
-    console.error("   error.code:", error.code);
-    console.error("   error.command:", error.command);
-    console.error("   error.response:", error.response);
-    console.error("   error.responseCode:", error.responseCode);
-    if (error.code === 'ETIMEDOUT' || error.code === 'ESOCKET') {
-      console.error("   ⚠️  TIMEOUT DETECTED: This is likely a network-level SMTP port block.");
-      console.error("   ⚠️  Ensure port 465 (SSL) is used, NOT port 587 (STARTTLS).");
-      console.error("   ⚠️  Render/Heroku may block outbound SMTP. Consider Resend/SendGrid.");
-    }
-    if (error.code === 'EAUTH') {
-      console.error("   ⚠️  AUTH FAILURE: Gmail App Password is invalid or expired.");
-      console.error("   ⚠️  Generate a new one at: https://myaccount.google.com/apppasswords");
+    console.error("   error.name:", error.name);
+    console.error("   error.statusCode:", error.statusCode);
+    if (error.message && error.message.includes("API key")) {
+      console.error("   ⚠️  Invalid or missing RESEND_API_KEY. Get one at: https://resend.com/api-keys");
     }
     return {
       success: false,
       message: "Failed to send OTP email",
       error: error.message,
-      code: error.code,
     };
   }
 };

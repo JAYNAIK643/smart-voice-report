@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/auth-context";
 
 const VerifyEmailOTP = () => {
   const [otp, setOtp] = useState("");
@@ -14,6 +15,7 @@ const VerifyEmailOTP = () => {
   const [attempts, setAttempts] = useState(5);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { updateUserFromStorage } = useAuth();
   const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
   const handleVerify = async (e) => {
@@ -48,12 +50,19 @@ const VerifyEmailOTP = () => {
 
       if (data.success) {
         // Store auth token and user object (auth context requires both)
+        console.log("🔐 [VerifyEmailOTP] Storing authToken and user in localStorage");
         localStorage.setItem("authToken", data.data.token);
         if (data.data.user) {
           localStorage.setItem("user", JSON.stringify(data.data.user));
+          console.log("🔐 [VerifyEmailOTP] User stored:", data.data.user.email, "role:", data.data.user.role);
         }
         localStorage.removeItem("tempAuthToken");
         localStorage.removeItem("userId");
+
+        // Sync auth context state from localStorage (context only reads on mount)
+        updateUserFromStorage();
+        console.log("🔐 [VerifyEmailOTP] Auth context synced via updateUserFromStorage");
+
         toast({
           title: "Success",
           description: "Email verified! Logging in...",
@@ -65,6 +74,7 @@ const VerifyEmailOTP = () => {
         if (userRole === "admin") redirectPath = "/admin/dashboard";
         else if (userRole === "ward_admin") redirectPath = "/ward-admin/dashboard";
 
+        console.log("🔐 [VerifyEmailOTP] Navigating to:", redirectPath);
         setTimeout(() => navigate(redirectPath, { replace: true }), 500);
       } else {
         const remaining = data.data?.attemptsRemaining ?? attempts - 1;

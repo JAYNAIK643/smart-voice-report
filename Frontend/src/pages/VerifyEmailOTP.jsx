@@ -47,14 +47,25 @@ const VerifyEmailOTP = () => {
       console.log("OTP verification response:", data);
 
       if (data.success) {
+        // Store auth token and user object (auth context requires both)
         localStorage.setItem("authToken", data.data.token);
+        if (data.data.user) {
+          localStorage.setItem("user", JSON.stringify(data.data.user));
+        }
         localStorage.removeItem("tempAuthToken");
         localStorage.removeItem("userId");
         toast({
           title: "Success",
           description: "Email verified! Logging in...",
         });
-        setTimeout(() => navigate("/dashboard", { replace: true }), 1000);
+
+        // Determine redirect based on user role
+        const userRole = data.data.user?.role;
+        let redirectPath = "/dashboard";
+        if (userRole === "admin") redirectPath = "/admin/dashboard";
+        else if (userRole === "ward_admin") redirectPath = "/ward-admin/dashboard";
+
+        setTimeout(() => navigate(redirectPath, { replace: true }), 500);
       } else {
         const remaining = data.data?.attemptsRemaining ?? attempts - 1;
         setAttempts(remaining);

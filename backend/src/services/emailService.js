@@ -201,9 +201,10 @@
 console.log("📧 emailService.js loaded");
 
 const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
 /*
- * SendGrid transporter intentionally commented out to prefer Gmail SMTP (free)
+ * SendGrid transporter intentionally commented out to prefer Resend API + Gmail SMTP fallback.
  * If SendGrid is required in future, uncomment the block below and set SENDGRID_API_KEY.
  */
 // const createSendGridTransporter = () => {
@@ -219,11 +220,54 @@ const nodemailer = require("nodemailer");
 //   });
 // };
 
+/**
+ * Get a Resend client instance.
+ * Uses RESEND_API_KEY for HTTP-based email delivery (no SMTP ports required).
+ * @returns {Object|null} Resend client or null if not configured
+ */
+const getResendClient = () => {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("⚠️ Resend API key not configured. RESEND_API_KEY missing.");
+    return null;
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
+
+/**
+ * Send an email via Resend API (HTTP/443 — works on Render, Heroku, etc.)
+ * @param {Object} mailOptions - { from, to, subject, html }
+ * @param {string} [emailType] - Optional type label for logging (e.g. "complaint", "status update")
+ * @returns {Object} { success, provider?, error? }
+ */
+const sendViaResend = async (mailOptions, emailType = "email") => {
+  const resend = getResendClient();
+  if (!resend) return { success: false, error: "Resend API key not configured" };
+
+  const fromAddress = process.env.EMAIL_FROM || "SmartCity Portal <onboarding@resend.dev>";
+  console.log(`📧 Sending ${emailType} email via Resend (from: ${fromAddress}, to: ${mailOptions.to})`);
+
+  const { data, error } = await resend.emails.send({
+    from: fromAddress,
+    to: mailOptions.to,
+    subject: mailOptions.subject,
+    html: mailOptions.html,
+  });
+
+  if (error) {
+    console.error(`❌ RESEND ERROR (${emailType}): ${error.message || error.name}`);
+    return { success: false, error: error.message || "Resend API error" };
+  }
+
+  console.log(`✅ ${emailType.charAt(0).toUpperCase() + emailType.slice(1)} email sent via Resend to ${mailOptions.to} | id: ${data?.id}`);
+  return { success: true, provider: "Resend" };
+};
+
+/**
+ * Create Gmail SMTP transporter (fallback when Resend is unavailable or fails)
+ */
 const createGmailTransporter = () => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.error("❌ Gmail SMTP not configured: EMAIL_USER or EMAIL_PASS missing from environment variables.");
-    console.error("   EMAIL_USER set:", !!process.env.EMAIL_USER);
-    console.error("   EMAIL_PASS set:", !!process.env.EMAIL_PASS);
+    console.warn("⚠️ Gmail SMTP not configured: EMAIL_USER or EMAIL_PASS missing.");
     return null;
   }
   console.log("✅ Gmail SMTP credentials found:", process.env.EMAIL_USER);
@@ -231,31 +275,18 @@ const createGmailTransporter = () => {
   return nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
-    secure: true, // Direct SSL/TLS (port 465), NOT STARTTLS (port 587)
+    secure: true,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
     tls: {
-      rejectUnauthorized: false, // Allow self-signed certs on cloud platforms
+      rejectUnauthorized: false,
     },
-    // Timeout settings to prevent hanging on slow/failed SMTP connections
-    connectionTimeout: 10000,  // 10 seconds to establish TCP connection
-    greetingTimeout: 10000,    // 10 seconds for SMTP greeting
-    socketTimeout: 15000,      // 15 seconds for any socket operation
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
-};
-
-const getAvailableProviders = () => {
-  const providers = [];
-  // SendGrid usage removed in favor of Gmail SMTP (free).
-  // If you need SendGrid, uncomment the createSendGridTransporter block above and adjust this section.
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    providers.push({ name: "Gmail", transporter: createGmailTransporter() });
-  } else {
-    console.error("❌ No email provider available. Gmail SMTP requires EMAIL_USER and EMAIL_PASS environment variables.");
-  }
-  return providers.filter((p) => !!p.transporter);
 };
 
 const getSenderAddress = () =>
@@ -264,51 +295,72 @@ const getSenderAddress = () =>
   process.env.EMAIL_USER ||
   "SmartCity GRS <noreply@smartcityportal.com>";
 
-const sendEmailWithFallback = async (mailOptions) => {
-  const providers = getAvailableProviders();
+/**
+ * Send email with Resend-first, Gmail SMTP fallback strategy.
+ * Resend uses HTTP/443 (works on cloud platforms that block SMTP ports).
+ * Gmail SMTP is kept as a fallback for local/dev environments.
+ * @param {Object} mailOptions - { from, to, subject, html }
+ * @param {string} [emailType] - Optional type label for logging
+ */
+const sendEmailWithFallback = async (mailOptions, emailType = "email") => {
+  const hasResend = !!process.env.RESEND_API_KEY;
+  const hasGmail = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+
   console.log("📧 Email provider config:", {
-    hasSendGridKey: !!process.env.SENDGRID_API_KEY,
-    hasEmailUser: !!process.env.EMAIL_USER,
-    hasEmailPass: !!process.env.EMAIL_PASS,
-    emailUser: process.env.EMAIL_USER || "(not set)",
+    hasResendKey: hasResend,
+    hasGmailSmtp: hasGmail,
     sender: getSenderAddress(),
-    availableProviders: providers.map((p) => p.name),
     frontendUrl: process.env.FRONTEND_URL || "(not set)",
   });
 
-  if (providers.length === 0) {
-    const errorMsg = "Email service not configured. Set EMAIL_USER and EMAIL_PASS environment variables (Gmail SMTP - free).";
+  if (!hasResend && !hasGmail) {
+    const errorMsg = "No email provider configured. Set RESEND_API_KEY (recommended) or EMAIL_USER + EMAIL_PASS (Gmail SMTP).";
     console.error("❌", errorMsg);
     return { success: false, error: errorMsg };
   }
 
-  let lastError = null;
-  for (const provider of providers) {
+  // ===== 1. PRIMARY: Resend API (HTTP/443 — no SMTP port issues) =====
+  if (hasResend) {
     try {
-      console.log(`📧 Attempting email send via ${provider.name}`);
-      const info = await provider.transporter.sendMail(mailOptions);
-      console.log(`✅ Email sent via ${provider.name} to ${mailOptions.to} | messageId: ${info.messageId}`);
-      return { success: true, provider: provider.name };
+      const result = await sendViaResend(mailOptions, emailType);
+      if (result.success) return result;
+      console.warn("⚠️ Resend failed, attempting Gmail SMTP fallback...");
     } catch (err) {
-      lastError = err;
-      console.error(`❌ EMAIL ERROR (${provider.name}):`);
-      console.error(`   error.message: ${err.message}`);
-      console.error(`   error.code: ${err.code}`);
-      console.error(`   error.command: ${err.command}`);
-      console.error(`   error.response: ${err.response}`);
-      console.error(`   error.responseCode: ${err.responseCode}`);
-      if (err.code === 'EAUTH') {
-        console.error("   → Authentication failed. Check EMAIL_PASS (must be a Gmail App Password, not your regular password).");
-        console.error("   → Generate App Password: https://myaccount.google.com/apppasswords");
-      }
-      if (err.code === 'ETIMEDOUT' || err.code === 'ESOCKET') {
-        console.error("   → TIMEOUT: Network-level SMTP port block. Ensure port 465 (SSL) is used.");
-        console.error("   → Consider migrating to Resend/SendGrid if Gmail SMTP is unreliable on this platform.");
+      console.error(`❌ RESEND EXCEPTION: ${err.message}`);
+      console.warn("⚠️ Resend threw exception, attempting Gmail SMTP fallback...");
+    }
+  }
+
+  // ===== 2. FALLBACK: Gmail SMTP (port 465 — may be blocked on cloud platforms) =====
+  if (hasGmail) {
+    const transporter = createGmailTransporter();
+    if (transporter) {
+      try {
+        console.log(`📧 Attempting email send via Gmail SMTP`);
+        // Override from address for Gmail SMTP (must match authenticated user)
+        const gmailMailOptions = {
+          ...mailOptions,
+          from: getSenderAddress(),
+        };
+        const info = await transporter.sendMail(gmailMailOptions);
+        console.log(`✅ Email sent via Gmail SMTP to ${mailOptions.to} | messageId: ${info.messageId}`);
+        return { success: true, provider: "Gmail SMTP" };
+      } catch (err) {
+        console.error(`❌ GMAIL SMTP ERROR:`);
+        console.error(`   error.message: ${err.message}`);
+        console.error(`   error.code: ${err.code}`);
+        if (err.code === 'EAUTH') {
+          console.error("   → Authentication failed. Check EMAIL_PASS (must be a Gmail App Password).");
+        }
+        if (err.code === 'ETIMEDOUT' || err.code === 'ESOCKET') {
+          console.error("   → TIMEOUT: SMTP port 465 blocked by cloud platform. Use RESEND_API_KEY instead.");
+        }
+        return { success: false, error: err.message || "Gmail SMTP delivery error" };
       }
     }
   }
 
-  return { success: false, error: lastError?.message || "Unknown email delivery error" };
+  return { success: false, error: "All email providers failed" };
 };
 
 // Email template helper function
@@ -467,7 +519,7 @@ const sendGrievanceConfirmation = async (userEmail, grievanceData) => {
 
   try {
     console.log(`📧 Sending grievance confirmation email to: ${userEmail}`);
-    const emailResult = await sendEmailWithFallback(mailOptions);
+    const emailResult = await sendEmailWithFallback(mailOptions, "complaint confirmation");
     if (!emailResult.success) {
       console.error("EMAIL ERROR:", emailResult.error);
       return { success: false, error: emailResult.error };
@@ -515,7 +567,7 @@ const sendStatusUpdateEmail = async (userEmail, grievanceData) => {
 
   try {
     console.log(`📧 Sending status update email to: ${userEmail}`);
-    const emailResult = await sendEmailWithFallback(mailOptions);
+    const emailResult = await sendEmailWithFallback(mailOptions, "status update");
     if (!emailResult.success) {
       console.error("EMAIL ERROR:", emailResult.error);
       return { success: false, error: emailResult.error };
@@ -712,7 +764,7 @@ const sendWardAdminInvitationEmail = async (userEmail, userName, ward, verificat
 
   try {
     console.log(`📧 Sending ward admin invitation email to: ${userEmail}`);
-    const emailResult = await sendEmailWithFallback(mailOptions);
+    const emailResult = await sendEmailWithFallback(mailOptions, "ward admin invitation");
     if (!emailResult.success) {
       console.error("EMAIL ERROR:", emailResult.error);
       return { success: false, error: emailResult.error };
@@ -804,7 +856,7 @@ const sendCriticalAlert = async (userEmail, alertData) => {
 
   try {
     console.log(`📧 Sending critical alert email to: ${userEmail}`);
-    const emailResult = await sendEmailWithFallback(mailOptions);
+    const emailResult = await sendEmailWithFallback(mailOptions, "critical alert");
     if (!emailResult.success) {
       console.error("EMAIL ERROR:", emailResult.error);
       return { success: false, error: emailResult.error };

@@ -586,7 +586,7 @@ const SubmitComplaint = () => {
 
       toast({
         title: "Success!",
-        description: "Complaint submitted successfully. Complaint ID has been sent to your email.",
+        description: "Complaint submitted successfully. You will receive a confirmation email shortly.",
       });
 
       // Trigger confetti celebration
